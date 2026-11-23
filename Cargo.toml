@@ -1,0 +1,12 @@
+[package]
+name = "sitevet-desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+directories = "6.0.0"
+futures = "0.3.34"
+gpui-kit = "0.11"
+serde = { version = "1.0.229", features = ["derive"] }
+sitevet = { version = "0.7", features = ["history", "browser"] }
+toml = "1.2.2"
