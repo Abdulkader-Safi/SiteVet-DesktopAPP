@@ -1,0 +1,21 @@
+<svg
+  preserveAspectRatio="none"
+  overflow="visible"
+  style="display: block;"
+  width="25"
+  height="22"
+  viewBox="0 0 25 22"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+<g id="tabler-icon-file-export">
+<path
+      id="Vector"
+      d="M13.3125 3V6.36842C13.3125 6.59176 13.3981 6.80595 13.5505 6.96388C13.7028 7.1218 13.9095 7.21053 14.125 7.21053H17.375M17.375 11.4211V7.21053L13.3125 3H7.625C7.19402 3 6.7807 3.17744 6.47595 3.49329C6.1712 3.80914 6 4.23753 6 4.68421V16.4737C6 16.9204 6.1712 17.3488 6.47595 17.6646C6.7807 17.9805 7.19402 18.1579 7.625 18.1579H11.2812M13.3125 16.4737H19M16.5625 19L19 16.4737L16.5625 13.9474"
+      stroke-width="1.33"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke="#9B9BA3"
+    />
+</g>
+</svg>
