@@ -1,5 +1,14 @@
 # Releases
 
+## v0.4.0 (2026-11-24)
+
+See what an audit is doing while it runs, and delete runs you no longer need.
+
+- The running screen names the stage it is in: crawling, rendering pages in Chrome with a count, or checking. Before, an audit with rendered checks on sat on "Crawling pages" for minutes while Chrome worked.
+- A line under the progress bar shows how long ago the audit last reported. After 30 quiet seconds it turns amber and says what is in progress.
+- An activity log next to the page list records every step with its time. Copy it for a bug report.
+- Delete a whole site from the sidebar, or one run from the History tab. A confirm dialog comes first, since the sitevet CLI reads the same history.
+
 ## v0.3.0 (2026-11-24)
 
 Settings and export, with fixes from a code review. v0.2.0 was never published; its changes ship here.
