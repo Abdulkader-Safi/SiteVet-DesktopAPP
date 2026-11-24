@@ -14,6 +14,7 @@ impl AssetSource for Assets {
             "icons/moon.svg" => include_bytes!("../assets/icons/moon.svg"),
             "icons/layout-sidebar.svg" => include_bytes!("../assets/icons/layout-sidebar.svg"),
             "icons/file-export.svg" => include_bytes!("../assets/icons/file-export.svg"),
+            "icons/settings.svg" => include_bytes!("../assets/icons/settings.svg"),
             _ => return gpui_kit::assets::Assets.load(path),
         };
         Ok(Some(Cow::Borrowed(bytes)))

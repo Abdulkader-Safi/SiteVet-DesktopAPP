@@ -10,6 +10,7 @@ use gpui_kit::*;
 use sitevet::{AuditEvent, AuditHandle, AuditReport, ReportDiff, RunId, Status};
 
 use crate::data::{self, AuditSettings, Site, time};
+use crate::editor::OptionsEditor;
 use crate::theme::{self, ActivePalette, TextStyles};
 use crate::ui;
 
@@ -17,6 +18,7 @@ use crate::ui;
 pub enum Screen {
     Report,
     NewAudit,
+    Settings,
     Running(usize),
     Batch,
 }
@@ -141,27 +143,14 @@ pub struct Batch {
     pub started_clock: String,
 }
 
-/// A setting from "Show all options": a text field mapped onto one `Options` field.
-pub struct Extra {
-    pub name: &'static str,
-    pub input: Entity<InputState>,
-    pub apply: fn(&mut sitevet::Options, &str) -> Result<(), String>,
-}
-
 pub struct Form {
     pub several: bool,
     pub start_url: Entity<InputState>,
-    pub max_pages: Entity<InputState>,
-    pub max_depth: Entity<InputState>,
-    pub concurrency: Entity<InputState>,
-    pub sites_at_a_time: Entity<InputState>,
     pub paste: Entity<InputState>,
-    pub extras: Vec<Extra>,
     pub sites: Vec<String>,
-    pub settings: AuditSettings,
-    pub show_all: bool,
+    /// Starts from the saved defaults; edits here apply to the next audit only.
+    pub editor: OptionsEditor,
     pub error: Option<String>,
-    pub note: Option<String>,
 }
 
 pub struct AppView {
@@ -192,6 +181,12 @@ pub struct AppView {
     pub changes_from_history: bool,
     // Audits.
     pub form: Form,
+    // Settings.
+    /// The saved defaults every new audit starts from.
+    pub defaults: AuditSettings,
+    pub defaults_editor: OptionsEditor,
+    pub settings_note: Option<String>,
+    pub settings_error: Option<String>,
     pub runs: Vec<LiveRun>,
     pub batch: Option<Batch>,
     ticking: bool,
@@ -199,7 +194,7 @@ pub struct AppView {
     pub update: Option<crate::update::Update>,
 }
 
-fn input(
+pub(crate) fn input(
     window: &mut Window,
     cx: &mut Context<AppView>,
     placeholder: &str,
@@ -216,143 +211,24 @@ fn input(
     e
 }
 
-fn opt_str(s: &str) -> Option<String> {
-    let s = s.trim();
-    (!s.is_empty()).then(|| s.to_string())
-}
-
-fn list(s: &str) -> Vec<String> {
-    s.split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .collect()
-}
-
-fn num<T: std::str::FromStr>(name: &str, s: &str) -> Result<T, String> {
-    s.trim()
-        .parse()
-        .map_err(|_| format!("{name} must be a whole number"))
-}
-
 impl AppView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let defaults = data::load_defaults();
-        let o = &defaults.options;
-        let extra =
-            |window: &mut Window, cx: &mut Context<Self>, name, value: String, apply| Extra {
-                name,
-                input: input(window, cx, "", value),
-                apply,
-            };
-        let extras = vec![
-            extra(window, cx, "DELAY MS", o.delay_ms.to_string(), |o, v| {
-                o.delay_ms = num("Delay", v)?;
-                Ok(())
-            }),
-            extra(
-                window,
-                cx,
-                "TIMEOUT MS",
-                o.timeout_ms.to_string(),
-                |o, v| {
-                    o.timeout_ms = num("Timeout", v)?;
-                    Ok(())
-                },
-            ),
-            extra(
-                window,
-                cx,
-                "USER AGENT",
-                o.user_agent.clone().unwrap_or_default(),
-                |o, v| {
-                    o.user_agent = opt_str(v);
-                    Ok(())
-                },
-            ),
-            extra(window, cx, "ONLY CATEGORIES", o.only.join(", "), |o, v| {
-                o.only = list(v);
-                Ok(())
-            }),
-            extra(window, cx, "SKIP CATEGORIES", o.skip.join(", "), |o, v| {
-                o.skip = list(v);
-                Ok(())
-            }),
-            extra(
-                window,
-                cx,
-                "CLICK DEPTH WARN",
-                o.click_depth_warn.to_string(),
-                |o, v| {
-                    o.click_depth_warn = num("Click depth warn", v)?;
-                    Ok(())
-                },
-            ),
-            extra(
-                window,
-                cx,
-                "SLOW RESOURCE MS",
-                o.slow_resource_ms.to_string(),
-                |o, v| {
-                    o.slow_resource_ms = num("Slow resource", v)?;
-                    Ok(())
-                },
-            ),
-            extra(
-                window,
-                cx,
-                "CHROME PATH",
-                o.chrome_path
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default(),
-                |o, v| {
-                    o.chrome_path = opt_str(v).map(Into::into);
-                    Ok(())
-                },
-            ),
-            extra(
-                window,
-                cx,
-                "PAGESPEED KEY",
-                o.psi_key.clone().unwrap_or_default(),
-                |o, v| {
-                    o.psi_key = opt_str(v);
-                    Ok(())
-                },
-            ),
-            extra(
-                window,
-                cx,
-                "PAGESPEED MAX PAGES",
-                o.psi_max_pages.to_string(),
-                |o, v| {
-                    o.psi_max_pages = num("PageSpeed max pages", v)?;
-                    Ok(())
-                },
-            ),
-        ];
         let form = Form {
             several: false,
             start_url: input(window, cx, "https://example.com", String::new()),
-            max_pages: input(window, cx, "", o.max_pages.to_string()),
-            max_depth: input(window, cx, "", o.max_depth.to_string()),
-            concurrency: input(window, cx, "", o.concurrency.to_string()),
-            sites_at_a_time: input(window, cx, "", defaults.sites_at_a_time.to_string()),
             paste: input(window, cx, "Paste URLs, one per line", String::new()),
-            extras,
             sites: Vec::new(),
-            settings: defaults,
-            show_all: false,
+            editor: OptionsEditor::new(&defaults, window, cx),
             error: None,
-            note: None,
         };
+        let defaults_editor = OptionsEditor::new(&defaults, window, cx);
         cx.subscribe_in(
             &form.start_url,
             window,
-            |this, _, ev: &InputEvent, _, cx| {
+            |this, _, ev: &InputEvent, window, cx| {
                 if matches!(ev, InputEvent::PressEnter { .. }) {
-                    this.run_from_form(cx);
+                    this.run_from_form(window, cx);
                 }
             },
         )
@@ -401,6 +277,10 @@ impl AppView {
             open_select: OpenSelect::None,
             changes_from_history: false,
             form,
+            defaults,
+            defaults_editor,
+            settings_note: None,
+            settings_error: None,
             runs: Vec::new(),
             batch: None,
             ticking: false,
@@ -560,35 +440,16 @@ impl AppView {
         cx.notify();
     }
 
-    /// Reads the form into settings, or says which field is wrong.
-    fn read_form(&self, cx: &App) -> Result<AuditSettings, String> {
-        let f = &self.form;
-        let v = |e: &Entity<InputState>| e.read(cx).value().to_string();
-        let mut s = f.settings.clone();
-        s.options.max_pages = num("Max pages", &v(&f.max_pages))?;
-        s.options.max_depth = num("Max depth", &v(&f.max_depth))?;
-        s.options.concurrency = num("Concurrency", &v(&f.concurrency))?;
-        s.sites_at_a_time = num::<usize>("Sites at a time", &v(&f.sites_at_a_time))?.max(1);
-        for extra in &f.extras {
-            (extra.apply)(&mut s.options, &v(&extra.input))?;
-        }
-        s.options.validate().map_err(|e| e.to_string())?;
-        Ok(s)
-    }
-
-    pub fn save_defaults(&mut self, cx: &mut Context<Self>) {
-        match self.read_form(cx).and_then(|s| data::save_defaults(&s)) {
-            Ok(()) => {
-                self.form.error = None;
-                self.form.note = Some("SAVED AS DEFAULTS".into());
-            }
-            Err(e) => self.form.error = Some(e),
-        }
+    /// Puts the saved defaults back into the new audit form.
+    pub fn reset_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let defaults = self.defaults.clone();
+        self.form.editor.load(&defaults, window, cx);
+        self.form.error = None;
         cx.notify();
     }
 
-    pub fn run_from_form(&mut self, cx: &mut Context<Self>) {
-        let settings = match self.read_form(cx) {
+    pub fn run_from_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let settings = match self.form.editor.read(cx) {
             Ok(s) => s,
             Err(e) => {
                 self.form.error = Some(e);
@@ -597,20 +458,31 @@ impl AppView {
             }
         };
         self.form.error = None;
-        self.form.note = None;
-        if self.form.several {
+        let started = if self.form.several {
             let urls = self.form.sites.clone();
             if urls.is_empty() {
                 self.form.error = Some("Add at least one site".into());
+                false
             } else {
                 self.start_batch(urls, settings, cx);
+                true
             }
         } else {
             let url = self.form.start_url.read(cx).value().trim().to_string();
             match data::parse_urls(&url).into_iter().next() {
-                Some(url) => self.start_one(url, settings, cx),
-                None => self.form.error = Some("Enter a start URL".into()),
+                Some(url) => {
+                    self.start_one(url, settings, cx);
+                    true
+                }
+                None => {
+                    self.form.error = Some("Enter a start URL".into());
+                    false
+                }
             }
+        };
+        // Values changed for this audit do not carry over to the next one.
+        if started {
+            self.reset_form(window, cx);
         }
         cx.notify();
     }
@@ -620,8 +492,48 @@ impl AppView {
         let Some(url) = self.site().map(|s| s.latest.start_url.clone()) else {
             return;
         };
-        let settings = self.read_form(cx).unwrap_or_else(|_| data::load_defaults());
-        self.start_one(url, settings, cx);
+        self.start_one(url, self.defaults.clone(), cx);
+    }
+
+    // ---- Settings ----
+
+    pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Show what is saved, not edits left from an earlier visit.
+        let defaults = self.defaults.clone();
+        self.defaults_editor.load(&defaults, window, cx);
+        self.settings_note = None;
+        self.settings_error = None;
+        self.screen = Screen::Settings;
+        cx.notify();
+    }
+
+    pub fn save_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.defaults_editor.read(cx) {
+            Ok(s) => match data::save_defaults(&s) {
+                Ok(()) => {
+                    // The form follows unless it holds values changed for one audit.
+                    let form_custom = self.form.editor.differs_from(&self.defaults, cx);
+                    self.defaults = s;
+                    if !form_custom {
+                        self.reset_form(window, cx);
+                    }
+                    self.settings_error = None;
+                    self.settings_note = Some("SAVED · NEW AUDITS START FROM THESE".into());
+                }
+                Err(e) => self.settings_error = Some(format!("Could not save: {e}")),
+            },
+            Err(e) => self.settings_error = Some(e),
+        }
+        cx.notify();
+    }
+
+    /// Fills the defaults editor with sitevet's own defaults. Nothing is saved until Save.
+    pub fn sdk_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.defaults_editor
+            .load(&AuditSettings::default(), window, cx);
+        self.settings_note = Some("NOT SAVED YET".into());
+        self.settings_error = None;
+        cx.notify();
     }
 
     // ---- The audit engine ----
@@ -1158,6 +1070,7 @@ impl AppView {
         let mut right: Option<String> = None;
         match self.screen {
             Screen::NewAudit => title = "New audit".into(),
+            Screen::Settings => title = "Settings".into(),
             Screen::Running(i) => {
                 let run = &self.runs[i];
                 title = run.url.clone();
@@ -1223,28 +1136,49 @@ impl AppView {
             // Export comes later; the icon holds its place.
             bar = bar.child(ui::icon("icons/file-export.svg", 25., 22., p.muted));
         }
-        bar.children(right.map(|r| ui::micro(r, p.muted))).child(
-            div()
-                .id("theme")
-                .flex()
-                .flex_none()
-                .items_center()
-                .justify_center()
-                .size(px(28.))
-                .cursor_pointer()
-                .hover(|s| s.bg(p.bg_raised))
-                .child(ui::icon(
-                    if dark {
-                        "icons/sun.svg"
-                    } else {
-                        "icons/moon.svg"
-                    },
-                    16.,
-                    16.,
-                    p.muted,
-                ))
-                .on_click(cx.listener(|this, _, _, cx| this.toggle_theme(cx))),
-        )
+        let on_settings = self.screen == Screen::Settings;
+        bar.children(right.map(|r| ui::micro(r, p.muted)))
+            .child(
+                div()
+                    .id("settings")
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .size(px(28.))
+                    .cursor_pointer()
+                    .when(on_settings, |d| d.bg(p.bg_raised))
+                    .hover(|s| s.bg(p.bg_raised))
+                    .child(ui::icon(
+                        "icons/settings.svg",
+                        16.,
+                        16.,
+                        if on_settings { p.text } else { p.muted },
+                    ))
+                    .on_click(cx.listener(|this, _, window, cx| this.open_settings(window, cx))),
+            )
+            .child(
+                div()
+                    .id("theme")
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .size(px(28.))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(p.bg_raised))
+                    .child(ui::icon(
+                        if dark {
+                            "icons/sun.svg"
+                        } else {
+                            "icons/moon.svg"
+                        },
+                        16.,
+                        16.,
+                        p.muted,
+                    ))
+                    .on_click(cx.listener(|this, _, _, cx| this.toggle_theme(cx))),
+            )
     }
 }
 
@@ -1295,6 +1229,7 @@ impl Render for AppView {
         let p = cx.pal();
         let body: AnyElement = match self.screen {
             Screen::NewAudit => self.render_new_audit(window, cx).into_any_element(),
+            Screen::Settings => self.render_settings(window, cx).into_any_element(),
             Screen::Running(i) => self.render_running(i, cx).into_any_element(),
             Screen::Batch => self.render_batch(cx).into_any_element(),
             Screen::Report => match self.site().is_some() {
