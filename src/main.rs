@@ -2,6 +2,7 @@ mod app;
 mod assets;
 mod data;
 mod editor;
+mod export;
 mod screens;
 mod theme;
 mod ui;

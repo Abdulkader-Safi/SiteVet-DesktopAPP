@@ -501,3 +501,17 @@ pub fn progress_bar(fraction: f32, w: Option<f32>, p: &Palette) -> Div {
     };
     track.child(div().h_full().w(relative(f)).bg(p.accent_text))
 }
+
+/// A card for the bottom-right corner: an update offer, an export result.
+pub fn toast_card(p: &Palette) -> Div {
+    div()
+        .w(px(320.))
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .p(px(16.))
+        .bg(p.bg_surface)
+        .border_1()
+        .border_color(p.border_strong)
+        .occlude()
+}

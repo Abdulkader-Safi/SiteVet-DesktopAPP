@@ -58,6 +58,7 @@ pub enum OpenSelect {
     Metric,
     CompareA,
     CompareB,
+    Export,
 }
 
 #[derive(Clone, PartialEq)]
@@ -192,6 +193,8 @@ pub struct AppView {
     ticking: bool,
     /// A newer release, until the popup is dismissed.
     pub update: Option<crate::update::Update>,
+    /// The last export, until its card is closed.
+    pub export_status: Option<crate::export::ExportStatus>,
 }
 
 pub(crate) fn input(
@@ -285,6 +288,7 @@ impl AppView {
             batch: None,
             ticking: false,
             update: None,
+            export_status: None,
         };
         this.reload_sites(None, cx);
         let check = cx.background_spawn(async { crate::update::check() });
@@ -1133,8 +1137,7 @@ impl AppView {
                     }))
                     .children(right.take().map(|r| ui::micro(r, p.muted))),
             );
-            // Export comes later; the icon holds its place.
-            bar = bar.child(ui::icon("icons/file-export.svg", 25., 22., p.muted));
+            bar = bar.child(self.export_button(cx));
         }
         let on_settings = self.screen == Screen::Settings;
         bar.children(right.map(|r| ui::micro(r, p.muted)))
@@ -1270,7 +1273,18 @@ impl Render for AppView {
                     .child(self.top_bar(cx))
                     .child(div().flex().flex_col().flex_1().min_h_0().child(body)),
             )
-            .children(self.update_popup(cx))
+            // Cards in the bottom-right corner, newest on top.
+            .child(
+                div()
+                    .absolute()
+                    .right(px(16.))
+                    .bottom(px(16.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .children(self.export_card(cx))
+                    .children(self.update_popup(cx)),
+            )
     }
 }
 
@@ -1282,20 +1296,7 @@ impl AppView {
         let p = cx.pal();
         let url = update.url.clone();
         Some(
-            div()
-                .id("update")
-                .absolute()
-                .right(px(16.))
-                .bottom(px(16.))
-                .w(px(320.))
-                .flex()
-                .flex_col()
-                .gap(px(10.))
-                .p(px(16.))
-                .bg(p.bg_surface)
-                .border_1()
-                .border_color(p.border_strong)
-                .occlude()
+            ui::toast_card(&p)
                 .child(
                     div()
                         .flex()
