@@ -82,7 +82,7 @@ fn status_line(run: &LiveRun, p: &Palette) -> Option<Div> {
                 .py(px(12.))
                 .small()
                 .text_color(p.muted)
-                .child("Saving to history…"),
+                .child("Saving to history"),
         ),
         _ => None,
     }
@@ -186,9 +186,10 @@ impl AppView {
                 )
             });
 
-        let active = run.active();
+        let cancellable = matches!(run.status, RunStatus::Queued | RunStatus::Running);
+        let saving = run.status == RunStatus::Saving;
         let finished_report =
-            matches!(run.status, RunStatus::Done).then(|| data::host_of(&run.url).to_string());
+            matches!(run.status, RunStatus::Done).then(|| data::origin_of(&run.url));
 
         div()
             .flex()
@@ -228,22 +229,19 @@ impl AppView {
                     ))
                     .child(ui::kpi("CHECKS", None, ui::kpi_value(checks, &p), &p))
                     .child(div().flex_none().px(px(20.)).map(|d| {
-                        if active {
+                        if saving {
+                            d
+                        } else if cancellable {
                             d.child(
                                 ui::button_secondary("cancel", "Cancel", 36., &p).on_click(
                                     cx.listener(move |this, _, _, cx| this.cancel(idx, cx)),
                                 ),
                             )
-                        } else if let Some(host) = finished_report.clone() {
+                        } else if let Some(origin) = finished_report.clone() {
                             d.child(ui::button_primary("open", "Open report", 36., &p).on_click(
                                 cx.listener(move |this, _, _, cx| {
-                                    if let Some(o) = this
-                                        .sites
-                                        .iter()
-                                        .find(|s| s.host() == host)
-                                        .map(|s| s.origin.clone())
-                                    {
-                                        this.open_site(&o, cx);
+                                    if this.sites.iter().any(|s| s.origin == origin) {
+                                        this.open_site(&origin, cx);
                                     }
                                 }),
                             ))
@@ -366,18 +364,13 @@ impl AppView {
                     .child(ui::progress_bar(r.fraction(), Some(148.), &p))
                     .child(ui::micro(format!("{:.0}%", r.fraction() * 100.), p.muted)),
             };
-            let host = data::host_of(&r.url).to_string();
-            let host_label = host.clone();
+            let origin = data::origin_of(&r.url);
+            let host_label = data::host_of(&r.url).to_string();
             let action = match r.status {
                 RunStatus::Done => Some(ui::link(("open", i), "Open report", &p).on_click(
                     cx.listener(move |this, _, _, cx| {
-                        if let Some(o) = this
-                            .sites
-                            .iter()
-                            .find(|s| s.host() == host)
-                            .map(|s| s.origin.clone())
-                        {
-                            this.open_site(&o, cx);
+                        if this.sites.iter().any(|s| s.origin == origin) {
+                            this.open_site(&origin, cx);
                         }
                     }),
                 )),

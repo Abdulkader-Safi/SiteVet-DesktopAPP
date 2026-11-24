@@ -174,6 +174,8 @@ pub struct AppView {
     // History tab.
     pub reports: HashMap<RunId, Arc<AuditReport>>,
     pub loading: HashSet<RunId>,
+    /// Runs whose stored report could not be read, with the reason.
+    pub load_failed: HashMap<RunId, String>,
     pub range: Range,
     pub metric: Option<String>,
     pub compare: (Option<RunId>, Option<RunId>),
@@ -273,6 +275,7 @@ impl AppView {
             detail: DetailTab::Findings,
             reports: HashMap::new(),
             loading: HashSet::new(),
+            load_failed: HashMap::new(),
             range: Range::All,
             metric: None,
             compare: (None, None),
@@ -318,7 +321,11 @@ impl AppView {
                         for s in &app.sites {
                             app.reports.insert(s.latest_run().id, s.latest.clone());
                         }
-                        let first = app.selected.is_none() && select.is_none();
+                        // Only on a fresh start: never pull the user off a screen they moved to.
+                        let first = app.selected.is_none()
+                            && select.is_none()
+                            && app.screen == Screen::NewAudit
+                            && app.runs.is_empty();
                         if let Some(origin) = select {
                             app.open_site(&origin, cx);
                         } else if first
@@ -346,6 +353,8 @@ impl AppView {
             self.page = None;
             self.detail = DetailTab::Findings;
             self.compare = (None, None);
+            self.compare_cache = None;
+            self.changes_from_history = false;
             self.metric = None;
         }
         self.selected = Some(origin.to_string());
@@ -363,7 +372,11 @@ impl AppView {
             .runs
             .iter()
             .map(|r| r.id)
-            .filter(|id| !self.reports.contains_key(id) && !self.loading.contains(id))
+            .filter(|id| {
+                !self.reports.contains_key(id)
+                    && !self.loading.contains(id)
+                    && !self.load_failed.contains_key(id)
+            })
             .collect();
         if missing.is_empty() {
             return;
@@ -372,15 +385,22 @@ impl AppView {
         let task = cx.background_spawn(async move {
             missing
                 .into_iter()
-                .filter_map(|id| data::load_report(id).ok().map(|r| (id, r)))
+                .map(|id| (id, data::load_report(id)))
                 .collect::<Vec<_>>()
         });
         cx.spawn(async move |this, cx| {
             let loaded = task.await;
             let _ = this.update(cx, |app, cx| {
-                for (id, r) in loaded {
+                for (id, result) in loaded {
                     app.loading.remove(&id);
-                    app.reports.insert(id, Arc::new(r));
+                    match result {
+                        Ok(r) => {
+                            app.reports.insert(id, Arc::new(r));
+                        }
+                        Err(e) => {
+                            app.load_failed.insert(id, e);
+                        }
+                    }
                 }
                 cx.notify();
             });
@@ -392,6 +412,8 @@ impl AppView {
         self.tab = tab;
         self.open_select = OpenSelect::None;
         if tab == Tab::History {
+            // Runs that failed to load get another try each time History opens.
+            self.load_failed.clear();
             self.load_history(cx);
         }
         if tab != Tab::Changes {
@@ -400,11 +422,17 @@ impl AppView {
         cx.notify();
     }
 
-    /// The active run for a site, if any.
-    pub fn run_for(&self, host: &str) -> Option<usize> {
+    /// The active run for a site (by origin), if any.
+    pub fn run_for(&self, origin: &str) -> Option<usize> {
         self.runs
             .iter()
-            .rposition(|r| r.active() && data::host_of(&r.url) == host)
+            .rposition(|r| r.active() && data::origin_of(&r.url) == origin)
+    }
+
+    /// The history site a URL belongs to.
+    pub fn site_for(&self, url: &str) -> Option<&Site> {
+        let origin = data::origin_of(url);
+        self.sites.iter().find(|s| s.origin == origin)
     }
 
     pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
@@ -453,7 +481,7 @@ impl AppView {
     }
 
     pub fn run_from_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let settings = match self.form.editor.read(cx) {
+        let settings = match self.form.editor.read_with(self.form.several, cx) {
             Ok(s) => s,
             Err(e) => {
                 self.form.error = Some(e);
@@ -523,10 +551,12 @@ impl AppView {
                     }
                     self.settings_error = None;
                     self.settings_note = Some("SAVED · NEW AUDITS START FROM THESE".into());
+                    self.form.error = None;
                 }
                 Err(e) => self.settings_error = Some(format!("Could not save: {e}")),
             },
-            Err(e) => self.settings_error = Some(e),
+            // The settings screen shows field errors live from the fields themselves.
+            Err(_) => self.settings_error = None,
         }
         cx.notify();
     }
@@ -535,7 +565,7 @@ impl AppView {
     pub fn sdk_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.defaults_editor
             .load(&AuditSettings::default(), window, cx);
-        self.settings_note = Some("NOT SAVED YET".into());
+        self.settings_note = None;
         self.settings_error = None;
         cx.notify();
     }
@@ -543,12 +573,7 @@ impl AppView {
     // ---- The audit engine ----
 
     fn new_run(&self, url: String, settings: AuditSettings) -> LiveRun {
-        let host = data::host_of(&url);
-        let prev = self
-            .sites
-            .iter()
-            .find(|s| s.host() == host)
-            .map(|s| (s.runs.len(), s.latest.score));
+        let prev = self.site_for(&url).map(|s| (s.runs.len(), s.latest.score));
         LiveRun {
             max_pages: settings.options.max_pages,
             url,
@@ -586,12 +611,22 @@ impl AppView {
             let run = self.new_run(url, settings.clone());
             self.runs.push(run);
         }
-        self.batch = Some(Batch {
-            runs: (first..self.runs.len()).collect(),
-            parallel,
-            started: Instant::now(),
-            started_clock: time::now_clock(),
-        });
+        let new: Vec<usize> = (first..self.runs.len()).collect();
+        match &mut self.batch {
+            // Sites still queued in the earlier batch would otherwise never start.
+            Some(b) if b.runs.iter().any(|&i| self.runs[i].active()) => {
+                b.runs.extend(new);
+                b.parallel = parallel;
+            }
+            _ => {
+                self.batch = Some(Batch {
+                    runs: new,
+                    parallel,
+                    started: Instant::now(),
+                    started_clock: time::now_clock(),
+                })
+            }
+        }
         self.screen = Screen::Batch;
         self.pump_batch(cx);
     }
@@ -633,13 +668,15 @@ impl AppView {
 
     pub fn cancel(&mut self, idx: usize, cx: &mut Context<Self>) {
         let run = &mut self.runs[idx];
-        if run.active() {
+        // A run that is saving has finished; its report is going into history either way.
+        if matches!(run.status, RunStatus::Queued | RunStatus::Running) {
             if let Some(h) = run.handle.take() {
                 h.cancel();
             }
             run.elapsed_ms = run.elapsed();
             run.status = RunStatus::Cancelled;
         }
+        self.pump_batch(cx);
         cx.notify();
     }
 
@@ -785,9 +822,8 @@ impl AppView {
         if open {
             self.tab = Tab::Pages;
         }
-        let host = data::host_of(&origin).to_string();
         // Select the site once history reloads, so the left pane and report show the new run.
-        let select = open.then(|| host.clone());
+        let select = open.then(|| data::origin_of(&origin));
         let task = cx.background_spawn(async { data::load_sites() });
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -798,12 +834,8 @@ impl AppView {
                         app.reports.insert(s.latest_run().id, s.latest.clone());
                     }
                 }
-                if let Some(host) = select
-                    && let Some(origin) = app
-                        .sites
-                        .iter()
-                        .find(|s| s.host() == host)
-                        .map(|s| s.origin.clone())
+                if let Some(origin) = select
+                    && app.sites.iter().any(|s| s.origin == origin)
                 {
                     // Fresh selection so the report opens on its worst page.
                     app.selected = None;
@@ -857,8 +889,12 @@ impl AppView {
             }
             return;
         }
+        let m = &ev.keystroke.modifiers;
+        if m.platform || m.control || m.alt || m.function {
+            return;
+        }
         let target = match ev.keystroke.key.as_str() {
-            "p" => Some(&self.site_search),
+            "p" if self.sidebar => Some(&self.site_search),
             "c" if self.screen == Screen::Report && self.tab == Tab::Pages => {
                 Some(&self.category_search)
             }
@@ -890,9 +926,9 @@ impl AppView {
             if !query.is_empty() && !host.contains(&query) {
                 continue;
             }
-            let run = self.run_for(&host);
+            let run = self.run_for(&site.origin);
             let selected = match self.screen {
-                Screen::Running(r) => data::host_of(&self.runs[r].url) == host,
+                Screen::Running(r) => data::origin_of(&self.runs[r].url) == site.origin,
                 Screen::Report => self.selected.as_deref() == Some(site.origin.as_str()),
                 _ => false,
             };
@@ -913,23 +949,24 @@ impl AppView {
             rows.push(
                 row.id(("site", i))
                     .when(selected, |d| d.bg(p.bg_raised).child(ui::edge(&p)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        match this.run_for(data::host_of(&origin)) {
+                    .on_click(
+                        cx.listener(move |this, _, _, cx| match this.run_for(&origin) {
                             Some(r) => {
                                 this.screen = Screen::Running(r);
                                 cx.notify();
                             }
                             None => this.open_site(&origin, cx),
-                        }
-                    }))
+                        }),
+                    )
                     .into_any_element(),
             );
         }
-        let known: HashSet<String> = self.sites.iter().map(|s| s.host().to_string()).collect();
+        let known: HashSet<&str> = self.sites.iter().map(|s| s.origin.as_str()).collect();
         let mut shown = HashSet::new();
         for (i, run) in self.runs.iter().enumerate().rev() {
+            let origin = data::origin_of(&run.url);
             let host = data::host_of(&run.url).to_string();
-            if !run.active() || known.contains(&host) || !shown.insert(host.clone()) {
+            if !run.active() || known.contains(origin.as_str()) || !shown.insert(origin) {
                 continue;
             }
             if !query.is_empty() && !host.contains(&query) {

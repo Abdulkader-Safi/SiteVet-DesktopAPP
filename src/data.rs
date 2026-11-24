@@ -113,6 +113,15 @@ pub fn category_name(id: &str) -> String {
         .map_or_else(|| id.to_string(), |(_, n)| n.to_string())
 }
 
+/// `https://example.com` for any URL on that site, the way the history database groups
+/// runs: scheme, host and port, lowercased. The URL itself when it does not parse.
+pub fn origin_of(url: &str) -> String {
+    url::Url::parse(url.trim()).map_or_else(
+        |_| url.trim().to_string(),
+        |u| u.origin().ascii_serialization(),
+    )
+}
+
 /// `abdulkadersafi.com` from `https://abdulkadersafi.com/blog`.
 pub fn host_of(url: &str) -> &str {
     let rest = url.split_once("://").map_or(url, |(_, r)| r);
@@ -442,6 +451,8 @@ mod tests {
             host_of("https://dsrpt.com.au/think-tank?x=1"),
             "dsrpt.com.au"
         );
+        assert_eq!(origin_of("https://A.com/x?y"), "https://a.com");
+        assert_ne!(origin_of("http://a.com"), origin_of("https://a.com"));
         assert_eq!(path_of("https://a.com"), "/");
         assert_eq!(path_of("https://a.com/work/vouch"), "/work/vouch");
         assert_eq!(

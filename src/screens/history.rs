@@ -234,7 +234,7 @@ impl AppView {
                     .map(|d| change_list("new", &d.new_failures, p.fail, Some(3), &p)),
             )
             .when(diff.is_none(), |d| {
-                d.child(div().small().text_color(p.muted).child("Loading runs…"))
+                d.child(self.compare_note(&site, a, b, &p))
             })
             .child(
                 ui::link("full-compare", "Open the full comparison", &p).on_click(cx.listener(
@@ -624,7 +624,7 @@ impl AppView {
                     );
                 }
             }
-            _ => body = body.child(div().small().text_color(p.muted).child("Loading runs…")),
+            _ => body = body.child(self.compare_note(site, a, b, &p)),
         }
 
         card(&p)
@@ -642,6 +642,22 @@ impl AppView {
                     .child(legend(p.accent_bg, format!("RUN {}", n(b)), &p)),
             )
             .child(body)
+    }
+}
+
+impl AppView {
+    /// What to show while the picked runs are not both loaded.
+    fn compare_note(&self, site: &data::Site, a: RunId, b: RunId, p: &Palette) -> Div {
+        let failed = [a, b]
+            .into_iter()
+            .find_map(|id| self.load_failed.get(&id).map(|e| (id, e)));
+        match failed {
+            Some((id, e)) => div().small().text_color(p.fail).child(format!(
+                "Run {} could not be read: {e}",
+                site.run_number(id).unwrap_or(0)
+            )),
+            None => div().small().text_color(p.muted).child("Loading runs"),
+        }
     }
 }
 
