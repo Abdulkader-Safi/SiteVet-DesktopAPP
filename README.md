@@ -26,7 +26,7 @@ When a newer release is out, the app shows a small card in the bottom-right corn
 - Settings (the gear in the top bar) shows the app version and links, and holds the audit defaults: limits, checks and every other option. New audits start from them. A value changed on the new audit form applies to that audit only, and Reset to defaults puts the saved values back. They are kept in `desktop-defaults.toml`, next to the history database.
 - Keyboard: `P` jumps to the site search. On the Pages tab, `C` searches categories and `/` searches pages.
 
-Export is planned. Its icon sits in the top bar but does nothing yet.
+Export (the file icon in the report's top bar) saves the open run as an HTML report, Markdown or JSON. Pick a format, choose where to save it, and a card in the bottom-right corner opens the file or shows it in Finder. The HTML file opens in any browser and prints to PDF; the Markdown pastes into Word, Google Docs or an email.
 
 ## Run from source
 
@@ -63,6 +63,7 @@ src/
   theme.rs       colour tokens, type scale and fonts from the Figma file
   ui.rs          shared components: score chip, status badge, buttons, fields
   editor.rs      the audit options editor shared by New audit and Settings
+  export.rs      the export menu, save dialog and result card
   screens/       report, history, new audit, progress, settings
 assets/
   fonts/         Schibsted Grotesk, JetBrains Mono, Saira Stencil One (OFL)
