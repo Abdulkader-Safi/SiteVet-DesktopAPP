@@ -3,10 +3,31 @@
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::{AppView, LiveRun, RunStatus, Screen};
+use crate::app::{AppView, LiveRun, LogLevel, RunStatus, Screen, clock};
 use crate::data;
 use crate::theme::{ActivePalette, Palette, TextStyles};
 use crate::ui;
+
+/// A tab over the running screen's list: label over a 2px accent underline.
+fn list_tab(id: &'static str, text: String, active: bool, p: &Palette) -> Stateful<Div> {
+    let label = div()
+        .mono_label()
+        .whitespace_nowrap()
+        .child(text.to_uppercase());
+    div()
+        .id(id)
+        .flex()
+        .flex_col()
+        .gap(px(12.))
+        .pt(px(14.))
+        .cursor_pointer()
+        .child(if active {
+            label.text_color(p.text)
+        } else {
+            label.text_color(p.muted)
+        })
+        .child(div().h(px(2.)).w_full().when(active, |d| d.bg(p.accent_bg)))
+}
 
 fn strip(p: &Palette) -> Div {
     div()
@@ -58,6 +79,57 @@ fn progress(title: String, sub: String, fraction: f32, p: &Palette) -> Div {
         .child(ui::progress_bar(fraction, None, p))
 }
 
+/// Seconds of silence before the activity line turns amber.
+const QUIET_WARN_MS: u64 = 30_000;
+
+/// What the engine is doing while it says nothing, in words.
+fn quiet_hint(run: &LiveRun) -> String {
+    match (run.pages_total, run.rendered) {
+        (None, Some((done, total))) => format!(
+            "Chrome is rendering page {} of {total}. A slow page can take up to a minute.",
+            (done + 1).min(total)
+        ),
+        (None, None) => match run.fetched.last() {
+            Some(f) => format!(
+                "It is reading the pages it fetched. The last one was {} ({} in {} ms).",
+                data::path_of(&f.url),
+                if f.status == 0 { "no response".to_string() } else { f.status.to_string() },
+                f.ms
+            ),
+            None => "It is fetching the start page, robots.txt and the sitemap.".into(),
+        },
+        (Some(_), _) => "It is checking links on the remaining pages. Sites with many links to other sites take longer.".into(),
+    }
+}
+
+fn activity_line(run: &LiveRun, p: &Palette) -> Option<Div> {
+    let quiet = run.quiet_ms()?;
+    let warn = quiet >= QUIET_WARN_MS;
+    let ago = data::duration_label(quiet);
+    let row = div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(8.))
+        .px(px(20.))
+        .py(px(10.))
+        .border_b_1()
+        .border_color(p.border);
+    Some(if warn {
+        row.bg(p.bg_sunken)
+            .child(ui::marker(p.warn, 8.))
+            .child(div().small().text_color(p.text).child(format!(
+            "No update from the audit for {ago}. {} Open the activity log to see the last step.",
+            quiet_hint(run)
+        )))
+    } else {
+        row.child(ui::marker(p.pass, 6.)).child(ui::micro(
+            format!("WORKING · LAST UPDATE {} AGO", ago.to_uppercase()),
+            p.muted,
+        ))
+    })
+}
+
 fn status_line(run: &LiveRun, p: &Palette) -> Option<Div> {
     match &run.status {
         RunStatus::Failed(e) => Some(
@@ -103,29 +175,38 @@ impl AppView {
         } else {
             "—".into()
         };
-        let per_page = match run.pages_total {
-            Some(n) if n > 0 => format!("{} checks per page · ", run.checks_total / n),
-            _ => format!("{} pages found · ", run.fetched.len()),
+        let concurrency = run.settings.options.concurrency;
+        let (title, sub) = match (run.pages_total, run.rendered) {
+            (Some(n), _) => (
+                "Checking pages",
+                format!(
+                    "{} checks per page · {concurrency} requests at a time",
+                    run.checks_total / n.max(1)
+                ),
+            ),
+            (None, Some((done, total))) => (
+                "Rendering pages in Chrome",
+                format!("{done} of {total} pages · axe-core and Core Web Vitals"),
+            ),
+            (None, None) => (
+                "Crawling pages",
+                format!(
+                    "{} pages found · {concurrency} requests at a time",
+                    run.fetched.len()
+                ),
+            ),
         };
-        let sub = format!(
-            "{per_page}{} requests at a time",
-            run.settings.options.concurrency
-        );
-        let title = if crawling {
-            "Crawling pages"
-        } else {
-            "Crawling and checking pages"
-        };
+        let failed = run.failed_fetches;
 
         // Pages still in flight: fetched but not finished, newest first, as many as run at once.
         let finished: std::collections::HashSet<&str> =
             run.completed.iter().map(|(u, _)| u.as_str()).collect();
-        let in_flight: Vec<&String> = if run.status == RunStatus::Running {
+        let in_flight: Vec<&crate::app::Fetched> = if run.status == RunStatus::Running {
             run.fetched
                 .iter()
                 .rev()
-                .filter(|u| !finished.contains(u.as_str()))
-                .take(run.settings.options.concurrency as usize)
+                .filter(|f| !finished.contains(f.url.as_str()))
+                .take(concurrency as usize)
                 .collect()
         } else {
             Vec::new()
@@ -158,17 +239,25 @@ impl AppView {
                 .child(ui::spacer())
                 .child(right)
         };
-        let checking = in_flight.into_iter().map(|u| {
+        let checking = in_flight.into_iter().map(|f| {
+            let (color, word) = match (crawling, f.status) {
+                (_, 0) => (p.fail, "NO RESPONSE".to_string()),
+                (true, s) => (
+                    if s >= 400 { p.warn } else { p.info },
+                    format!("FETCHED {s} · {} MS", f.ms),
+                ),
+                (false, _) => (p.info, "CHECKING".to_string()),
+            };
             row(
                 "—".into(),
-                data::path_of(u),
+                data::path_of(&f.url),
                 true,
                 div()
                     .flex()
                     .items_center()
                     .gap(px(6.))
-                    .child(ui::marker(p.info, 6.))
-                    .child(ui::micro("CHECKING", p.muted)),
+                    .child(ui::marker(color, 6.))
+                    .child(ui::micro(word, p.muted)),
             )
         });
         let total_pages = run.pages_total.unwrap_or(run.max_pages);
@@ -186,6 +275,54 @@ impl AppView {
                 )
             });
 
+        let show_log = self.run_log;
+        let log_len = run.log.len();
+        let log_rows: Vec<Div> = if show_log {
+            run.log
+                .iter()
+                .rev()
+                .map(|l| {
+                    let color = match l.level {
+                        LogLevel::Info => p.muted,
+                        LogLevel::Warn => p.warn,
+                        LogLevel::Fail => p.fail,
+                    };
+                    div()
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .gap(px(16.))
+                        .px(px(20.))
+                        .py(px(6.))
+                        .border_b_1()
+                        .border_color(p.border)
+                        .child(
+                            div()
+                                .w(px(52.))
+                                .flex_none()
+                                .mono_micro()
+                                .text_color(p.muted)
+                                .child(clock(l.at_ms)),
+                        )
+                        .child(ui::marker(color, 6.))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .mono_small()
+                                .text_color(if l.level == LogLevel::Info {
+                                    p.text
+                                } else {
+                                    color
+                                })
+                                .truncate()
+                                .child(l.text.clone()),
+                        )
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
         let cancellable = matches!(run.status, RunStatus::Queued | RunStatus::Running);
         let saving = run.status == RunStatus::Saving;
         let finished_report =
@@ -253,19 +390,53 @@ impl AppView {
                     })),
             )
             .child(progress(title.into(), sub, run.fraction(), &p))
+            .children(activity_line(run, &p))
             .children(status_line(run, &p))
             .child(
                 div()
                     .flex()
                     .flex_none()
-                    .items_center()
+                    .items_end()
+                    .gap(px(20.))
                     .px(px(20.))
-                    .py(px(14.))
                     .border_b_1()
                     .border_color(p.border)
-                    .child(ui::label("PAGES AS THEY FINISH", &p))
+                    .child(
+                        list_tab("tab-pages", "Pages as they finish".into(), !show_log, &p)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.run_log = false;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        list_tab("tab-log", format!("Activity log {}", log_len), show_log, &p)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.run_log = true;
+                                cx.notify();
+                            })),
+                    )
                     .child(ui::spacer())
-                    .child(ui::micro("NEWEST FIRST", p.muted)),
+                    .when(failed > 0, |d| {
+                        d.child(div().pb(px(14.)).child(ui::micro(
+                            format!(
+                                "{failed} FAILED REQUEST{}",
+                                if failed == 1 { "" } else { "S" }
+                            ),
+                            p.warn,
+                        )))
+                    })
+                    .child(div().pb(px(14.)).map(|d| {
+                        if show_log {
+                            d.child(ui::link("copy-log", "Copy log", &p).on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    let text = this.runs[idx].log_text();
+                                    cx.write_to_clipboard(ClipboardItem::new_string(text));
+                                },
+                            )))
+                        } else {
+                            d.child(ui::micro("NEWEST FIRST", p.muted))
+                        }
+                    })),
             )
             .child(
                 div()
@@ -275,8 +446,13 @@ impl AppView {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .children(checking)
-                    .children(finished_rows),
+                    .map(|d| {
+                        if show_log {
+                            d.children(log_rows)
+                        } else {
+                            d.children(checking).children(finished_rows)
+                        }
+                    }),
             )
     }
 
@@ -330,8 +506,14 @@ impl AppView {
             }
         };
         let rows = runs.iter().map(|&(i, r)| {
+            let quiet = r.quiet_ms().filter(|&q| q >= QUIET_WARN_MS);
             let (word, color) = match r.status {
                 RunStatus::Done => ("DONE", p.pass),
+                // A long silence turns the marker amber, as on the single-audit screen.
+                RunStatus::Running if quiet.is_some() => ("NO UPDATE", p.warn),
+                RunStatus::Running if r.pages_total.is_none() && r.rendered.is_some() => {
+                    ("RENDERING", p.info)
+                }
                 RunStatus::Running | RunStatus::Saving => ("RUNNING", p.info),
                 RunStatus::Queued => ("QUEUED", p.skip),
                 RunStatus::Failed(_) => ("FAILED", p.fail),

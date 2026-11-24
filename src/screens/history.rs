@@ -8,7 +8,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use sitevet::{AuditReport, RunId};
 
-use crate::app::{AppView, OpenSelect, Range, Tab};
+use crate::app::{AppView, Delete, OpenSelect, Range, Tab};
 use crate::data::{self, category_name, time};
 use crate::screens::report::{card, change_list};
 use crate::theme::{ActivePalette, Palette, TextStyles};
@@ -156,8 +156,10 @@ impl AppView {
                 (None, "")
             };
             let id = r.id;
+            let group = SharedString::from(format!("run-row-{id}"));
             rows.push(
                 div()
+                    .group(group.clone())
                     .id(("run-row", id as u64))
                     .flex()
                     .flex_none()
@@ -213,6 +215,22 @@ impl AppView {
                             )),
                     )
                     .child(ui::micro(delta, p.muted))
+                    .child(
+                        ui::trash_button(("del-run", id as u64), group.clone(), false, &p)
+                            .on_click(cx.listener({
+                                let origin = site.origin.clone();
+                                move |this, _, _, cx| {
+                                    cx.stop_propagation();
+                                    this.ask_delete(
+                                        Delete::Run {
+                                            id,
+                                            origin: origin.clone(),
+                                        },
+                                        cx,
+                                    );
+                                }
+                            })),
+                    )
                     .child(ui::score_chip(r.score, &p))
                     .into_any_element(),
             );

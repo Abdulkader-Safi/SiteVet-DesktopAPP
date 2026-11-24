@@ -515,3 +515,49 @@ pub fn toast_card(p: &Palette) -> Div {
         .border_color(p.border_strong)
         .occlude()
 }
+
+/// Outline button in the danger colour, for deleting.
+pub fn button_danger(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    h: f32,
+    p: &Palette,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .h(px(h))
+        .px(px(16.))
+        .border_1()
+        .border_color(p.fail)
+        .text_color(p.fail)
+        .body_medium()
+        .cursor_pointer()
+        .hover(|s| s.bg(p.bg_raised))
+        .child(text.into())
+}
+
+/// A trash button that shows on hover of its row's `group`, and always on a selected row.
+pub fn trash_button(
+    id: impl Into<ElementId>,
+    group: SharedString,
+    always: bool,
+    p: &Palette,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(28.))
+        .cursor_pointer()
+        .when(!always, |d| {
+            d.opacity(0.).group_hover(group, |s| s.opacity(1.))
+        })
+        .hover(|s| s.bg(p.bg_raised))
+        .child(icon("icons/trash.svg", 14., 14., p.muted))
+}
