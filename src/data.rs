@@ -37,8 +37,16 @@ pub struct Issues {
 }
 
 pub fn page_issues(page: &PageResult) -> Issues {
-    let issues = page.findings.iter().filter(|f| matches!(f.status, Status::Fail | Status::Warn)).count();
-    let fail = page.findings.iter().filter(|f| f.status == Status::Fail).count();
+    let issues = page
+        .findings
+        .iter()
+        .filter(|f| matches!(f.status, Status::Fail | Status::Warn))
+        .count();
+    let fail = page
+        .findings
+        .iter()
+        .filter(|f| f.status == Status::Fail)
+        .count();
     Issues { issues, fail }
 }
 
@@ -56,12 +64,17 @@ pub fn site_issues(report: &AuditReport) -> Issues {
             fail += 1;
         }
     }
-    Issues { issues: rules.len(), fail }
+    Issues {
+        issues: rules.len(),
+        fail,
+    }
 }
 
 /// Totals across categories: (pass, warn, fail).
 pub fn totals(report: &AuditReport) -> (u32, u32, u32) {
-    report.categories.iter().fold((0, 0, 0), |(p, w, f), c| (p + c.pass, w + c.warn, f + c.fail))
+    report.categories.iter().fold((0, 0, 0), |(p, w, f), c| {
+        (p + c.pass, w + c.warn, f + c.fail)
+    })
 }
 
 pub fn issues_label(i: &Issues) -> String {
@@ -94,7 +107,10 @@ const CATEGORY_NAMES: [(&str, &str); 17] = [
 ];
 
 pub fn category_name(id: &str) -> String {
-    CATEGORY_NAMES.iter().find(|(c, _)| *c == id).map_or_else(|| id.to_string(), |(_, n)| n.to_string())
+    CATEGORY_NAMES
+        .iter()
+        .find(|(c, _)| *c == id)
+        .map_or_else(|| id.to_string(), |(_, n)| n.to_string())
 }
 
 /// `abdulkadersafi.com` from `https://abdulkadersafi.com/blog`.
@@ -119,7 +135,9 @@ pub fn load_sites() -> Result<Vec<Site>, String> {
 }
 
 pub fn load_sites_from(history: &History) -> Result<Vec<Site>, String> {
-    let all = history.list(None, usize::MAX >> 1).map_err(|e| e.to_string())?;
+    let all = history
+        .list(None, usize::MAX >> 1)
+        .map_err(|e| e.to_string())?;
     // `list` is newest first; group by origin keeping that order for the site list.
     let mut origins: Vec<String> = Vec::new();
     for r in &all {
@@ -129,19 +147,28 @@ pub fn load_sites_from(history: &History) -> Result<Vec<Site>, String> {
     }
     let mut sites = Vec::new();
     for origin in origins {
-        let mut runs: Vec<RunSummary> = all.iter().filter(|r| r.origin == origin).cloned().collect();
+        let mut runs: Vec<RunSummary> =
+            all.iter().filter(|r| r.origin == origin).cloned().collect();
         runs.reverse();
         let latest_id = runs.last().map(|r| r.id).unwrap_or_default();
         // A run saved by a newer sitevet can't be read; skip the site rather than fail the list.
-        let Ok(report) = history.load(latest_id) else { continue };
-        sites.push(Site { origin, runs, latest: Arc::new(report) });
+        let Ok(report) = history.load(latest_id) else {
+            continue;
+        };
+        sites.push(Site {
+            origin,
+            runs,
+            latest: Arc::new(report),
+        });
     }
     Ok(sites)
 }
 
 /// Reads one stored report. Blocking.
 pub fn load_report(id: sitevet::RunId) -> Result<AuditReport, String> {
-    History::open(None).and_then(|h| h.load(id)).map_err(|e| e.to_string())
+    History::open(None)
+        .and_then(|h| h.load(id))
+        .map_err(|e| e.to_string())
 }
 
 /// Saves a finished report, first attaching a diff against the site's previous run when
@@ -149,7 +176,9 @@ pub fn load_report(id: sitevet::RunId) -> Result<AuditReport, String> {
 pub fn save_report(report: &mut AuditReport, compare: bool) -> Result<sitevet::RunId, String> {
     let history = History::open(None).map_err(|e| e.to_string())?;
     if compare
-        && let Some(prev) = history.latest_for(&report.start_url).map_err(|e| e.to_string())?
+        && let Some(prev) = history
+            .latest_for(&report.start_url)
+            .map_err(|e| e.to_string())?
         && let Ok(baseline) = history.load(prev)
     {
         let mut diff = sitevet::diff(&baseline, report);
@@ -171,7 +200,12 @@ pub struct AuditSettings {
 
 impl Default for AuditSettings {
     fn default() -> Self {
-        Self { options: Options::default(), check_external_links: true, compare_with_last: true, sites_at_a_time: 2 }
+        Self {
+            options: Options::default(),
+            check_external_links: true,
+            compare_with_last: true,
+            sites_at_a_time: 2,
+        }
     }
 }
 
@@ -184,7 +218,10 @@ impl AuditSettings {
     pub fn options_for_run(&self) -> Options {
         let mut options = self.options.clone();
         if !self.check_external_links {
-            let rules = sitevet::all_rules().into_iter().filter(|r| r.meta().id != EXTERNAL_LINKS_RULE).collect();
+            let rules = sitevet::all_rules()
+                .into_iter()
+                .filter(|r| r.meta().id != EXTERNAL_LINKS_RULE)
+                .collect();
             options.rules = Some(rules);
         }
         options
@@ -211,7 +248,10 @@ pub fn settings_to_toml(s: &AuditSettings) -> Result<String, String> {
         compare_with_last: s.compare_with_last,
         sites_at_a_time: s.sites_at_a_time,
     };
-    table.insert("desktop".into(), toml::Value::try_from(desktop).map_err(|e| e.to_string())?);
+    table.insert(
+        "desktop".into(),
+        toml::Value::try_from(desktop).map_err(|e| e.to_string())?,
+    );
     toml::to_string(&table).map_err(|e| e.to_string())
 }
 
@@ -220,7 +260,10 @@ pub fn settings_from_toml(text: &str) -> Result<AuditSettings, String> {
     let desktop = table.remove("desktop");
     let options = Options::from_toml_str(&toml::to_string(&table).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
-    let mut s = AuditSettings { options, ..Default::default() };
+    let mut s = AuditSettings {
+        options,
+        ..Default::default()
+    };
     if let Some(d) = desktop.and_then(|d| d.try_into::<DesktopKeys>().ok()) {
         s.check_external_links = d.check_external_links;
         s.compare_with_last = d.compare_with_last;
@@ -251,7 +294,13 @@ pub fn parse_urls(text: &str) -> Vec<String> {
     text.lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
-        .map(|l| if l.contains("://") { l.to_string() } else { format!("https://{l}") })
+        .map(|l| {
+            if l.contains("://") {
+                l.to_string()
+            } else {
+                format!("https://{l}")
+            }
+        })
         .collect()
 }
 
@@ -260,19 +309,27 @@ pub mod time {
     use jiff::{Timestamp, tz::TimeZone};
 
     fn local(rfc3339: &str) -> Option<jiff::ZonedDateTime> {
-        rfc3339.parse::<Timestamp>().ok().map(|t| t.to_zoned_datetime(TimeZone::system()))
+        rfc3339
+            .parse::<Timestamp>()
+            .ok()
+            .map(|t| t.to_zoned_datetime(TimeZone::system()))
     }
 
     /// `2026-11-13 14:39`
     pub fn date_time(rfc3339: &str) -> String {
-        local(rfc3339).map_or_else(|| rfc3339.to_string(), |z| z.strftime("%Y-%m-%d %H:%M").to_string())
+        local(rfc3339).map_or_else(
+            || rfc3339.to_string(),
+            |z| z.strftime("%Y-%m-%d %H:%M").to_string(),
+        )
     }
 
     /// `2026-11-13`
     pub fn date(rfc3339: &str) -> String {
-        local(rfc3339).map_or_else(|| rfc3339.to_string(), |z| z.strftime("%Y-%m-%d").to_string())
+        local(rfc3339).map_or_else(
+            || rfc3339.to_string(),
+            |z| z.strftime("%Y-%m-%d").to_string(),
+        )
     }
-
 
     /// `14:52` for now.
     pub fn now_clock() -> String {
@@ -289,13 +346,19 @@ pub mod time {
 
     /// Days since a timestamp, for the "30 days" and "90 days" filters.
     pub fn age_days(rfc3339: &str) -> i64 {
-        rfc3339.parse::<Timestamp>().map_or(i64::MAX, |t| (Timestamp::now().as_second() - t.as_second()) / 86_400)
+        rfc3339.parse::<Timestamp>().map_or(i64::MAX, |t| {
+            (Timestamp::now().as_second() - t.as_second()) / 86_400
+        })
     }
 }
 
 /// `189.4 S`, `2 min 14 s`.
 pub fn duration_label(ms: u64) -> String {
-    if ms < 60_000 { format!("{:.1} s", ms as f64 / 1000.0) } else { format!("{} min {} s", ms / 60_000, ms / 1000 % 60) }
+    if ms < 60_000 {
+        format!("{:.1} s", ms as f64 / 1000.0)
+    } else {
+        format!("{} min {} s", ms / 60_000, ms / 1000 % 60)
+    }
 }
 
 /// `13,156`
@@ -303,7 +366,7 @@ pub fn thousands(n: u64) -> String {
     let s = n.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -358,7 +421,10 @@ mod tests {
         let r = report(
             90,
             &[
-                ("https://a.com/", &[("a/x", "fail"), ("a/y", "warn"), ("a/z", "pass")]),
+                (
+                    "https://a.com/",
+                    &[("a/x", "fail"), ("a/y", "warn"), ("a/z", "pass")],
+                ),
                 ("https://a.com/b", &[("a/x", "fail")]),
             ],
         );
@@ -372,10 +438,16 @@ mod tests {
 
     #[test]
     fn urls_and_numbers() {
-        assert_eq!(host_of("https://dsrpt.com.au/think-tank?x=1"), "dsrpt.com.au");
+        assert_eq!(
+            host_of("https://dsrpt.com.au/think-tank?x=1"),
+            "dsrpt.com.au"
+        );
         assert_eq!(path_of("https://a.com"), "/");
         assert_eq!(path_of("https://a.com/work/vouch"), "/work/vouch");
-        assert_eq!(parse_urls("a.com\n\n  https://b.org  \n"), vec!["https://a.com", "https://b.org"]);
+        assert_eq!(
+            parse_urls("a.com\n\n  https://b.org  \n"),
+            vec!["https://a.com", "https://b.org"]
+        );
         assert_eq!(thousands(13156), "13,156");
         assert_eq!(thousands(100), "100");
         assert_eq!(signed(0), "±0");
@@ -398,7 +470,10 @@ mod tests {
 
     #[test]
     fn external_links_switch_drops_only_that_rule() {
-        let s = AuditSettings { check_external_links: false, ..Default::default() };
+        let s = AuditSettings {
+            check_external_links: false,
+            ..Default::default()
+        };
         let rules = s.options_for_run().rules.unwrap();
         assert_eq!(rules.len(), sitevet::all_rules().len() - 1);
         assert!(rules.iter().all(|r| r.meta().id != EXTERNAL_LINKS_RULE));

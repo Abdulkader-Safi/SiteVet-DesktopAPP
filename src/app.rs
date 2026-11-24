@@ -94,7 +94,10 @@ pub struct LiveRun {
 
 impl LiveRun {
     pub fn active(&self) -> bool {
-        matches!(self.status, RunStatus::Queued | RunStatus::Running | RunStatus::Saving)
+        matches!(
+            self.status,
+            RunStatus::Queued | RunStatus::Running | RunStatus::Saving
+        )
     }
 
     pub fn elapsed(&self) -> u64 {
@@ -194,10 +197,20 @@ pub struct AppView {
     ticking: bool,
 }
 
-fn input(window: &mut Window, cx: &mut Context<AppView>, placeholder: &str, value: String) -> Entity<InputState> {
+fn input(
+    window: &mut Window,
+    cx: &mut Context<AppView>,
+    placeholder: &str,
+    value: String,
+) -> Entity<InputState> {
     let placeholder = placeholder.to_string();
-    let e = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder).default_value(value));
-    cx.subscribe(&e, |_, _, _: &InputEvent, cx| cx.notify()).detach();
+    let e = cx.new(|cx| {
+        InputState::new(window, cx)
+            .placeholder(placeholder)
+            .default_value(value)
+    });
+    cx.subscribe(&e, |_, _, _: &InputEvent, cx| cx.notify())
+        .detach();
     e
 }
 
@@ -207,43 +220,115 @@ fn opt_str(s: &str) -> Option<String> {
 }
 
 fn list(s: &str) -> Vec<String> {
-    s.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()
+    s.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 fn num<T: std::str::FromStr>(name: &str, s: &str) -> Result<T, String> {
-    s.trim().parse().map_err(|_| format!("{name} must be a whole number"))
+    s.trim()
+        .parse()
+        .map_err(|_| format!("{name} must be a whole number"))
 }
 
 impl AppView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let defaults = data::load_defaults();
         let o = &defaults.options;
-        let extra = |window: &mut Window, cx: &mut Context<Self>, name, value: String, apply| Extra {
-            name,
-            input: input(window, cx, "", value),
-            apply,
-        };
+        let extra =
+            |window: &mut Window, cx: &mut Context<Self>, name, value: String, apply| Extra {
+                name,
+                input: input(window, cx, "", value),
+                apply,
+            };
         let extras = vec![
-            extra(window, cx, "DELAY MS", o.delay_ms.to_string(), |o, v| Ok(o.delay_ms = num("Delay", v)?)),
-            extra(window, cx, "TIMEOUT MS", o.timeout_ms.to_string(), |o, v| Ok(o.timeout_ms = num("Timeout", v)?)),
-            extra(window, cx, "USER AGENT", o.user_agent.clone().unwrap_or_default(), |o, v| {
-                Ok(o.user_agent = opt_str(v))
+            extra(window, cx, "DELAY MS", o.delay_ms.to_string(), |o, v| {
+                o.delay_ms = num("Delay", v)?;
+                Ok(())
             }),
-            extra(window, cx, "ONLY CATEGORIES", o.only.join(", "), |o, v| Ok(o.only = list(v))),
-            extra(window, cx, "SKIP CATEGORIES", o.skip.join(", "), |o, v| Ok(o.skip = list(v))),
-            extra(window, cx, "CLICK DEPTH WARN", o.click_depth_warn.to_string(), |o, v| {
-                Ok(o.click_depth_warn = num("Click depth warn", v)?)
+            extra(
+                window,
+                cx,
+                "TIMEOUT MS",
+                o.timeout_ms.to_string(),
+                |o, v| {
+                    o.timeout_ms = num("Timeout", v)?;
+                    Ok(())
+                },
+            ),
+            extra(
+                window,
+                cx,
+                "USER AGENT",
+                o.user_agent.clone().unwrap_or_default(),
+                |o, v| {
+                    o.user_agent = opt_str(v);
+                    Ok(())
+                },
+            ),
+            extra(window, cx, "ONLY CATEGORIES", o.only.join(", "), |o, v| {
+                o.only = list(v);
+                Ok(())
             }),
-            extra(window, cx, "SLOW RESOURCE MS", o.slow_resource_ms.to_string(), |o, v| {
-                Ok(o.slow_resource_ms = num("Slow resource", v)?)
+            extra(window, cx, "SKIP CATEGORIES", o.skip.join(", "), |o, v| {
+                o.skip = list(v);
+                Ok(())
             }),
-            extra(window, cx, "CHROME PATH", o.chrome_path.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), |o, v| {
-                Ok(o.chrome_path = opt_str(v).map(Into::into))
-            }),
-            extra(window, cx, "PAGESPEED KEY", o.psi_key.clone().unwrap_or_default(), |o, v| Ok(o.psi_key = opt_str(v))),
-            extra(window, cx, "PAGESPEED MAX PAGES", o.psi_max_pages.to_string(), |o, v| {
-                Ok(o.psi_max_pages = num("PageSpeed max pages", v)?)
-            }),
+            extra(
+                window,
+                cx,
+                "CLICK DEPTH WARN",
+                o.click_depth_warn.to_string(),
+                |o, v| {
+                    o.click_depth_warn = num("Click depth warn", v)?;
+                    Ok(())
+                },
+            ),
+            extra(
+                window,
+                cx,
+                "SLOW RESOURCE MS",
+                o.slow_resource_ms.to_string(),
+                |o, v| {
+                    o.slow_resource_ms = num("Slow resource", v)?;
+                    Ok(())
+                },
+            ),
+            extra(
+                window,
+                cx,
+                "CHROME PATH",
+                o.chrome_path
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default(),
+                |o, v| {
+                    o.chrome_path = opt_str(v).map(Into::into);
+                    Ok(())
+                },
+            ),
+            extra(
+                window,
+                cx,
+                "PAGESPEED KEY",
+                o.psi_key.clone().unwrap_or_default(),
+                |o, v| {
+                    o.psi_key = opt_str(v);
+                    Ok(())
+                },
+            ),
+            extra(
+                window,
+                cx,
+                "PAGESPEED MAX PAGES",
+                o.psi_max_pages.to_string(),
+                |o, v| {
+                    o.psi_max_pages = num("PageSpeed max pages", v)?;
+                    Ok(())
+                },
+            ),
         ];
         let form = Form {
             several: false,
@@ -260,17 +345,25 @@ impl AppView {
             error: None,
             note: None,
         };
-        cx.subscribe_in(&form.start_url, window, |this, _, ev: &InputEvent, _, cx| {
-            if matches!(ev, InputEvent::PressEnter { .. }) {
-                this.run_from_form(cx);
-            }
-        })
+        cx.subscribe_in(
+            &form.start_url,
+            window,
+            |this, _, ev: &InputEvent, _, cx| {
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    this.run_from_form(cx);
+                }
+            },
+        )
         .detach();
-        cx.subscribe_in(&form.paste, window, |this, _, ev: &InputEvent, window, cx| {
-            if matches!(ev, InputEvent::PressEnter { .. }) {
-                this.add_pasted(window, cx);
-            }
-        })
+        cx.subscribe_in(
+            &form.paste,
+            window,
+            |this, _, ev: &InputEvent, window, cx| {
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    this.add_pasted(window, cx);
+                }
+            },
+        )
         .detach();
         cx.observe_window_appearance(window, |this, window, cx| {
             if !this.theme_overridden {
@@ -331,7 +424,9 @@ impl AppView {
                         let first = app.selected.is_none() && select.is_none();
                         if let Some(origin) = select {
                             app.open_site(&origin, cx);
-                        } else if first && let Some(origin) = app.sites.first().map(|s| s.origin.clone()) {
+                        } else if first
+                            && let Some(origin) = app.sites.first().map(|s| s.origin.clone())
+                        {
                             app.open_site(&origin, cx);
                         }
                     }
@@ -367,14 +462,21 @@ impl AppView {
     /// Loads every stored report of the selected site, for the history chart and compare.
     pub fn load_history(&mut self, cx: &mut Context<Self>) {
         let Some(site) = self.site() else { return };
-        let missing: Vec<RunId> =
-            site.runs.iter().map(|r| r.id).filter(|id| !self.reports.contains_key(id) && !self.loading.contains(id)).collect();
+        let missing: Vec<RunId> = site
+            .runs
+            .iter()
+            .map(|r| r.id)
+            .filter(|id| !self.reports.contains_key(id) && !self.loading.contains(id))
+            .collect();
         if missing.is_empty() {
             return;
         }
         self.loading.extend(missing.iter().copied());
         let task = cx.background_spawn(async move {
-            missing.into_iter().filter_map(|id| data::load_report(id).ok().map(|r| (id, r))).collect::<Vec<_>>()
+            missing
+                .into_iter()
+                .filter_map(|id| data::load_report(id).ok().map(|r| (id, r)))
+                .collect::<Vec<_>>()
         });
         cx.spawn(async move |this, cx| {
             let loaded = task.await;
@@ -403,7 +505,9 @@ impl AppView {
 
     /// The active run for a site, if any.
     pub fn run_for(&self, host: &str) -> Option<usize> {
-        self.runs.iter().rposition(|r| r.active() && data::host_of(&r.url) == host)
+        self.runs
+            .iter()
+            .rposition(|r| r.active() && data::host_of(&r.url) == host)
     }
 
     pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
@@ -419,8 +523,13 @@ impl AppView {
         self.screen = Screen::NewAudit;
         self.form.error = None;
         if !self.form.several && self.form.start_url.read(cx).value().is_empty() {
-            let url = self.site().map(|s| s.latest.start_url.clone()).unwrap_or_default();
-            self.form.start_url.update(cx, |s, cx| s.set_value(url, window, cx));
+            let url = self
+                .site()
+                .map(|s| s.latest.start_url.clone())
+                .unwrap_or_default();
+            self.form
+                .start_url
+                .update(cx, |s, cx| s.set_value(url, window, cx));
         }
         cx.notify();
     }
@@ -432,7 +541,9 @@ impl AppView {
                 self.form.sites.push(url);
             }
         }
-        self.form.paste.update(cx, |s, cx| s.set_value("", window, cx));
+        self.form
+            .paste
+            .update(cx, |s, cx| s.set_value("", window, cx));
         cx.notify();
     }
 
@@ -493,7 +604,9 @@ impl AppView {
 
     /// "Run audit again" from history: the saved defaults on the site's start URL.
     pub fn rerun(&mut self, cx: &mut Context<Self>) {
-        let Some(url) = self.site().map(|s| s.latest.start_url.clone()) else { return };
+        let Some(url) = self.site().map(|s| s.latest.start_url.clone()) else {
+            return;
+        };
         let settings = self.read_form(cx).unwrap_or_else(|_| data::load_defaults());
         self.start_one(url, settings, cx);
     }
@@ -502,7 +615,11 @@ impl AppView {
 
     fn new_run(&self, url: String, settings: AuditSettings) -> LiveRun {
         let host = data::host_of(&url);
-        let prev = self.sites.iter().find(|s| s.host() == host).map(|s| (s.runs.len(), s.latest.score));
+        let prev = self
+            .sites
+            .iter()
+            .find(|s| s.host() == host)
+            .map(|s| (s.runs.len(), s.latest.score));
         LiveRun {
             max_pages: settings.options.max_pages,
             url,
@@ -553,7 +670,11 @@ impl AppView {
     /// Starts queued batch runs until `parallel` are in flight.
     fn pump_batch(&mut self, cx: &mut Context<Self>) {
         let Some(batch) = &self.batch else { return };
-        let running = batch.runs.iter().filter(|&&i| matches!(self.runs[i].status, RunStatus::Running)).count();
+        let running = batch
+            .runs
+            .iter()
+            .filter(|&&i| matches!(self.runs[i].status, RunStatus::Running))
+            .count();
         let next: Vec<usize> = batch
             .runs
             .iter()
@@ -594,7 +715,11 @@ impl AppView {
     }
 
     pub fn cancel_all(&mut self, cx: &mut Context<Self>) {
-        let ids = self.batch.as_ref().map(|b| b.runs.clone()).unwrap_or_default();
+        let ids = self
+            .batch
+            .as_ref()
+            .map(|b| b.runs.clone())
+            .unwrap_or_default();
         for i in ids {
             self.cancel(i, cx);
         }
@@ -641,11 +766,20 @@ impl AppView {
         match ev {
             AuditEvent::AuditStart { max_pages, .. } => run.max_pages = max_pages,
             AuditEvent::PageFetched { url, .. } => run.fetched.push(url),
-            AuditEvent::CrawlComplete { pages, checks_total, .. } => {
+            AuditEvent::CrawlComplete {
+                pages,
+                checks_total,
+                ..
+            } => {
                 run.pages_total = Some(pages);
                 run.checks_total = checks_total;
             }
-            AuditEvent::CheckComplete { status, checks_done, checks_total, .. } => {
+            AuditEvent::CheckComplete {
+                status,
+                checks_done,
+                checks_total,
+                ..
+            } => {
                 run.checks_done = checks_done;
                 run.checks_total = checks_total;
                 match status {
@@ -682,9 +816,15 @@ impl AppView {
         if self.runs[idx].status != RunStatus::Running {
             return;
         }
-        let Some(handle) = self.runs[idx].handle.take() else { return };
+        let Some(handle) = self.runs[idx].handle.take() else {
+            return;
+        };
         cx.spawn(async move |this, cx| {
-            let err = handle.report().await.err().map_or_else(|| "The audit stopped".to_string(), |e| e.to_string());
+            let err = handle
+                .report()
+                .await
+                .err()
+                .map_or_else(|| "The audit stopped".to_string(), |e| e.to_string());
             let _ = this.update(cx, |app, cx| {
                 let run = &mut app.runs[idx];
                 if run.status == RunStatus::Running {
@@ -698,7 +838,13 @@ impl AppView {
         .detach();
     }
 
-    fn on_saved(&mut self, idx: usize, report: AuditReport, saved: Result<RunId, String>, cx: &mut Context<Self>) {
+    fn on_saved(
+        &mut self,
+        idx: usize,
+        report: AuditReport,
+        saved: Result<RunId, String>,
+        cx: &mut Context<Self>,
+    ) {
         let origin = report.start_url.clone();
         let run = &mut self.runs[idx];
         run.report = Some(Arc::new(report));
@@ -724,7 +870,11 @@ impl AppView {
                     }
                 }
                 if let Some(host) = select
-                    && let Some(origin) = app.sites.iter().find(|s| s.host() == host).map(|s| s.origin.clone())
+                    && let Some(origin) = app
+                        .sites
+                        .iter()
+                        .find(|s| s.host() == host)
+                        .map(|s| s.origin.clone())
                 {
                     // Fresh selection so the report opens on its worst page.
                     app.selected = None;
@@ -746,11 +896,15 @@ impl AppView {
         self.ticking = true;
         cx.spawn(async move |this, cx| {
             loop {
-                cx.background_executor().timer(Duration::from_millis(250)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(250))
+                    .await;
                 let keep = this
                     .update(cx, |app, cx| {
                         cx.notify();
-                        app.runs.iter().any(|r| matches!(r.status, RunStatus::Running | RunStatus::Saving))
+                        app.runs
+                            .iter()
+                            .any(|r| matches!(r.status, RunStatus::Running | RunStatus::Saving))
                     })
                     .unwrap_or(false);
                 if !keep {
@@ -776,8 +930,12 @@ impl AppView {
         }
         let target = match ev.keystroke.key.as_str() {
             "p" => Some(&self.site_search),
-            "c" if self.screen == Screen::Report && self.tab == Tab::Pages => Some(&self.category_search),
-            "/" if self.screen == Screen::Report && self.tab == Tab::Pages => Some(&self.page_search),
+            "c" if self.screen == Screen::Report && self.tab == Tab::Pages => {
+                Some(&self.category_search)
+            }
+            "/" if self.screen == Screen::Report && self.tab == Tab::Pages => {
+                Some(&self.page_search)
+            }
             _ => None,
         };
         if let Some(input) = target {
@@ -814,18 +972,26 @@ impl AppView {
                 Some(r) => self.running_row(r, &host, &p),
                 None => {
                     let issues = data::site_issues(&site.latest);
-                    site_row(&host, data::issues_label(&issues), p.muted, ui::score_chip(site.latest.score, &p), &p)
+                    site_row(
+                        &host,
+                        data::issues_label(&issues),
+                        p.muted,
+                        ui::score_chip(site.latest.score, &p),
+                        &p,
+                    )
                 }
             };
             rows.push(
                 row.id(("site", i))
                     .when(selected, |d| d.bg(p.bg_raised).child(ui::edge(&p)))
-                    .on_click(cx.listener(move |this, _, _, cx| match this.run_for(data::host_of(&origin)) {
-                        Some(r) => {
-                            this.screen = Screen::Running(r);
-                            cx.notify();
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        match this.run_for(data::host_of(&origin)) {
+                            Some(r) => {
+                                this.screen = Screen::Running(r);
+                                cx.notify();
+                            }
+                            None => this.open_site(&origin, cx),
                         }
-                        None => this.open_site(&origin, cx),
                     }))
                     .into_any_element(),
             );
@@ -899,9 +1065,17 @@ impl AppView {
                     .child(ui::search_box(&self.site_search, "p", window, cx)),
             )
             .child(
-                div().flex().flex_none().p(px(12.)).border_b_1().border_color(p.border).child(
-                    button.flex_1().on_click(cx.listener(|this, _, window, cx| this.new_audit(window, cx))),
-                ),
+                div()
+                    .flex()
+                    .flex_none()
+                    .p(px(12.))
+                    .border_b_1()
+                    .border_color(p.border)
+                    .child(
+                        button.flex_1().on_click(
+                            cx.listener(|this, _, window, cx| this.new_audit(window, cx)),
+                        ),
+                    ),
             )
             .child(
                 div()
@@ -913,7 +1087,13 @@ impl AppView {
                     .overflow_y_scroll()
                     .children(rows)
                     .when_some(self.sites_error.clone(), |d, e| {
-                        d.child(div().p(px(16.)).small().text_color(p.fail).child(format!("History could not be read: {e}")))
+                        d.child(
+                            div()
+                                .p(px(16.))
+                                .small()
+                                .text_color(p.fail)
+                                .child(format!("History could not be read: {e}")),
+                        )
                     }),
             )
     }
@@ -923,9 +1103,18 @@ impl AppView {
         let (done, total) = run.pages();
         let (sub, right) = match run.status {
             RunStatus::Queued => ("QUEUED".to_string(), String::new()),
-            _ => (format!("RUNNING · {done} / {total}"), format!("{:.0}%", run.fraction() * 100.)),
+            _ => (
+                format!("RUNNING · {done} / {total}"),
+                format!("{:.0}%", run.fraction() * 100.),
+            ),
         };
-        site_row(host, sub, p.accent_text, div().mono_small().text_color(p.accent_text).child(right), p)
+        site_row(
+            host,
+            sub,
+            p.accent_text,
+            div().mono_small().text_color(p.accent_text).child(right),
+            p,
+        )
     }
 
     fn top_bar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -959,7 +1148,11 @@ impl AppView {
             Screen::Running(i) => {
                 let run = &self.runs[i];
                 title = run.url.clone();
-                right = Some(format!("RUN {} · STARTED {}", run.run_number(), run.started_clock));
+                right = Some(format!(
+                    "RUN {} · STARTED {}",
+                    run.run_number(),
+                    run.started_clock
+                ));
             }
             Screen::Batch => {
                 let b = self.batch.as_ref();
@@ -971,13 +1164,29 @@ impl AppView {
                 title = site.map(|s| s.latest.start_url.clone()).unwrap_or_default();
                 right = site.map(|s| match self.tab {
                     Tab::History => {
-                        format!("{} RUNS · SINCE {}", s.runs.len(), time::date(&s.runs[0].started_at))
+                        format!(
+                            "{} RUNS · SINCE {}",
+                            s.runs.len(),
+                            time::date(&s.runs[0].started_at)
+                        )
                     }
-                    _ => format!("RUN {} · {}", s.runs.len(), time::date_time(&s.latest_run().started_at)),
+                    _ => format!(
+                        "RUN {} · {}",
+                        s.runs.len(),
+                        time::date_time(&s.latest_run().started_at)
+                    ),
                 });
             }
         }
-        bar = bar.child(div().mono_small().text_color(p.muted).whitespace_nowrap().child(title)).child(ui::spacer());
+        bar = bar
+            .child(
+                div()
+                    .mono_small()
+                    .text_color(p.muted)
+                    .whitespace_nowrap()
+                    .child(title),
+            )
+            .child(ui::spacer());
         if self.screen == Screen::Report && self.site().is_some() {
             let tabs = [
                 (Tab::Overview, "Overview"),
@@ -1011,7 +1220,16 @@ impl AppView {
                 .size(px(28.))
                 .cursor_pointer()
                 .hover(|s| s.bg(p.bg_raised))
-                .child(ui::icon(if dark { "icons/sun.svg" } else { "icons/moon.svg" }, 16., 16., p.muted))
+                .child(ui::icon(
+                    if dark {
+                        "icons/sun.svg"
+                    } else {
+                        "icons/moon.svg"
+                    },
+                    16.,
+                    16.,
+                    p.muted,
+                ))
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_theme(cx))),
         )
     }
@@ -1037,8 +1255,20 @@ fn site_row(host: &str, sub: String, sub_color: Hsla, right: Div, p: &theme::Pal
                 .min_w_0()
                 .gap(px(2.))
                 .overflow_hidden()
-                .child(div().mono_small().text_color(p.text).truncate().child(host.to_string()))
-                .child(div().mono_micro().text_color(sub_color).truncate().child(sub)),
+                .child(
+                    div()
+                        .mono_small()
+                        .text_color(p.text)
+                        .truncate()
+                        .child(host.to_string()),
+                )
+                .child(
+                    div()
+                        .mono_micro()
+                        .text_color(sub_color)
+                        .truncate()
+                        .child(sub),
+                ),
         )
         .child(right)
 }

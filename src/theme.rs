@@ -106,21 +106,43 @@ impl ActivePalette for App {
 
 pub fn init(window_dark: bool, cx: &mut App) {
     let fonts: Vec<Cow<'static, [u8]>> = vec![
-        Cow::Borrowed(include_bytes!("../assets/fonts/SchibstedGrotesk-Regular.ttf")),
-        Cow::Borrowed(include_bytes!("../assets/fonts/SchibstedGrotesk-Medium.ttf")),
-        Cow::Borrowed(include_bytes!("../assets/fonts/SchibstedGrotesk-SemiBold.ttf")),
+        Cow::Borrowed(include_bytes!(
+            "../assets/fonts/SchibstedGrotesk-Regular.ttf"
+        )),
+        Cow::Borrowed(include_bytes!(
+            "../assets/fonts/SchibstedGrotesk-Medium.ttf"
+        )),
+        Cow::Borrowed(include_bytes!(
+            "../assets/fonts/SchibstedGrotesk-SemiBold.ttf"
+        )),
         Cow::Borrowed(include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf")),
         Cow::Borrowed(include_bytes!("../assets/fonts/JetBrainsMono-Medium.ttf")),
-        Cow::Borrowed(include_bytes!("../assets/fonts/SairaStencilOne-Regular.ttf")),
+        Cow::Borrowed(include_bytes!(
+            "../assets/fonts/SairaStencilOne-Regular.ttf"
+        )),
     ];
-    cx.text_system().add_fonts(fonts).expect("bundled fonts load");
+    cx.text_system()
+        .add_fonts(fonts)
+        .expect("bundled fonts load");
     set_dark(window_dark, cx);
 }
 
 pub fn set_dark(dark: bool, cx: &mut App) {
-    let pal = if dark { Palette::dark() } else { Palette::light() };
+    let pal = if dark {
+        Palette::dark()
+    } else {
+        Palette::light()
+    };
     cx.set_global(Appearance { dark, pal });
-    Theme::change(if dark { ThemeMode::Dark } else { ThemeMode::Light }, None, cx);
+    Theme::change(
+        if dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        },
+        None,
+        cx,
+    );
     // Map the tokens onto gpui-component so its inputs, menus and charts match the design.
     Theme::update(cx, |t| {
         t.font_family = SANS.into();
@@ -159,37 +181,59 @@ pub fn set_dark(dark: bool, cx: &mut App) {
 /// GPUI has no tracking setting.
 pub trait TextStyles: Styled + Sized {
     fn mono_micro(self) -> Self {
-        self.font_family(MONO).text_size(px(10.)).line_height(px(14.))
+        self.font_family(MONO)
+            .text_size(px(10.))
+            .line_height(px(14.))
     }
     fn mono_small(self) -> Self {
-        self.font_family(MONO).text_size(px(11.)).line_height(px(16.))
+        self.font_family(MONO)
+            .text_size(px(11.))
+            .line_height(px(16.))
     }
     fn mono_label(self) -> Self {
-        self.font_family(MONO).font_weight(FontWeight::MEDIUM).text_size(px(11.)).line_height(px(14.))
+        self.font_family(MONO)
+            .font_weight(FontWeight::MEDIUM)
+            .text_size(px(11.))
+            .line_height(px(14.))
     }
     fn mono(self) -> Self {
-        self.font_family(MONO).text_size(px(13.)).line_height(px(20.))
+        self.font_family(MONO)
+            .text_size(px(13.))
+            .line_height(px(20.))
     }
     fn score_text(self) -> Self {
-        self.font_family(MONO).font_weight(FontWeight::MEDIUM).text_size(px(28.)).line_height(px(32.))
+        self.font_family(MONO)
+            .font_weight(FontWeight::MEDIUM)
+            .text_size(px(28.))
+            .line_height(px(32.))
     }
     fn small(self) -> Self {
-        self.font_family(SANS).text_size(px(12.)).line_height(px(18.))
+        self.font_family(SANS)
+            .text_size(px(12.))
+            .line_height(px(18.))
     }
     fn small_medium(self) -> Self {
         self.small().font_weight(FontWeight::MEDIUM)
     }
     fn body(self) -> Self {
-        self.font_family(SANS).text_size(px(14.)).line_height(px(20.))
+        self.font_family(SANS)
+            .text_size(px(14.))
+            .line_height(px(20.))
     }
     fn body_medium(self) -> Self {
         self.body().font_weight(FontWeight::MEDIUM)
     }
     fn title(self) -> Self {
-        self.font_family(SANS).font_weight(FontWeight::SEMIBOLD).text_size(px(15.)).line_height(px(20.))
+        self.font_family(SANS)
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_size(px(15.))
+            .line_height(px(20.))
     }
     fn h2(self) -> Self {
-        self.font_family(SANS).font_weight(FontWeight::SEMIBOLD).text_size(px(20.)).line_height(px(26.))
+        self.font_family(SANS)
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_size(px(20.))
+            .line_height(px(26.))
     }
 }
 

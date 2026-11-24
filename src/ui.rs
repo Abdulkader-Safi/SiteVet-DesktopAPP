@@ -13,7 +13,12 @@ pub fn spacer() -> Div {
 }
 
 pub fn icon(path: &'static str, w: f32, h: f32, color: Hsla) -> Svg {
-    svg().path(path).w(px(w)).h(px(h)).flex_none().text_color(color)
+    svg()
+        .path(path)
+        .w(px(w))
+        .h(px(h))
+        .flex_none()
+        .text_color(color)
 }
 
 pub fn marker(color: Hsla, size: f32) -> Div {
@@ -22,12 +27,22 @@ pub fn marker(color: Hsla, size: f32) -> Div {
 
 /// "OVERALL", "CATEGORIES": Mono label in muted.
 pub fn label(text: impl Into<SharedString>, p: &Palette) -> Div {
-    div().flex_none().mono_label().text_color(p.muted).whitespace_nowrap().child(text.into())
+    div()
+        .flex_none()
+        .mono_label()
+        .text_color(p.muted)
+        .whitespace_nowrap()
+        .child(text.into())
 }
 
 /// "9 ISSUES · 2 FAIL": Mono micro in muted.
 pub fn micro(text: impl Into<SharedString>, color: Hsla) -> Div {
-    div().flex_none().mono_micro().text_color(color).whitespace_nowrap().child(text.into())
+    div()
+        .flex_none()
+        .mono_micro()
+        .text_color(color)
+        .whitespace_nowrap()
+        .child(text.into())
 }
 
 /// A score outlined in its band colour: good 90+, fair 50 to 89, poor below 50.
@@ -85,26 +100,67 @@ pub fn badge(word: &'static str, c: Hsla) -> Div {
 }
 
 /// Filter chip: "Lowest score", "All runs".
-pub fn chip(id: impl Into<ElementId>, text: &'static str, active: bool, p: &Palette) -> Stateful<Div> {
-    let base = div().id(id).flex_none().px(px(8.)).py(px(3.)).small().cursor_pointer().child(text);
+pub fn chip(
+    id: impl Into<ElementId>,
+    text: &'static str,
+    active: bool,
+    p: &Palette,
+) -> Stateful<Div> {
+    let base = div()
+        .id(id)
+        .flex_none()
+        .px(px(8.))
+        .py(px(3.))
+        .small()
+        .cursor_pointer()
+        .child(text);
     if active {
-        base.bg(p.accent_bg).text_color(p.accent_on).border_1().border_color(p.accent_bg)
+        base.bg(p.accent_bg)
+            .text_color(p.accent_on)
+            .border_1()
+            .border_color(p.accent_bg)
     } else {
-        base.border_1().border_color(p.border).text_color(p.muted).hover(|s| s.text_color(p.text))
+        base.border_1()
+            .border_color(p.border)
+            .text_color(p.muted)
+            .hover(|s| s.text_color(p.text))
     }
 }
 
 /// Segmented control segment: "One site" / "Several sites".
-pub fn segment(id: impl Into<ElementId>, text: &'static str, active: bool, p: &Palette) -> Stateful<Div> {
-    let base = div().id(id).flex_none().px(px(14.)).py(px(6.)).small().cursor_pointer().child(text);
+pub fn segment(
+    id: impl Into<ElementId>,
+    text: &'static str,
+    active: bool,
+    p: &Palette,
+) -> Stateful<Div> {
+    let base = div()
+        .id(id)
+        .flex_none()
+        .px(px(14.))
+        .py(px(6.))
+        .small()
+        .cursor_pointer()
+        .child(text);
     if active {
-        base.bg(p.accent_bg).text_color(p.accent_on).border_1().border_color(p.accent_bg)
+        base.bg(p.accent_bg)
+            .text_color(p.accent_on)
+            .border_1()
+            .border_color(p.accent_bg)
     } else {
-        base.border_1().border_color(p.border).text_color(p.muted).hover(|s| s.text_color(p.text))
+        base.border_1()
+            .border_color(p.border)
+            .text_color(p.muted)
+            .hover(|s| s.text_color(p.text))
     }
 }
 
-pub fn button_primary(id: impl Into<ElementId>, text: impl Into<SharedString>, h: f32, p: &Palette) -> Stateful<Div> {
+pub fn button_primary(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    h: f32,
+    p: &Palette,
+) -> Stateful<Div> {
     let big = h >= 40.;
     let base = div()
         .id(id)
@@ -119,10 +175,19 @@ pub fn button_primary(id: impl Into<ElementId>, text: impl Into<SharedString>, h
         .cursor_pointer()
         .hover(|s| s.opacity(0.9))
         .child(text.into());
-    if big { base.body_medium() } else { base.small_medium() }
+    if big {
+        base.body_medium()
+    } else {
+        base.small_medium()
+    }
 }
 
-pub fn button_secondary(id: impl Into<ElementId>, text: impl Into<SharedString>, h: f32, p: &Palette) -> Stateful<Div> {
+pub fn button_secondary(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    h: f32,
+    p: &Palette,
+) -> Stateful<Div> {
     let base = div()
         .id(id)
         .flex()
@@ -137,7 +202,11 @@ pub fn button_secondary(id: impl Into<ElementId>, text: impl Into<SharedString>,
         .cursor_pointer()
         .hover(|s| s.bg(p.bg_raised))
         .child(text.into());
-    if h >= 36. { base.body() } else { base.small_medium() }
+    if h >= 36. {
+        base.body()
+    } else {
+        base.small_medium()
+    }
 }
 
 /// Text link in accent: "Show all options", "Open report".
@@ -155,16 +224,34 @@ pub fn link(id: impl Into<ElementId>, text: impl Into<SharedString>, p: &Palette
 
 /// Square 34x18 switch.
 pub fn toggle(id: impl Into<ElementId>, on: bool, p: &Palette) -> Stateful<Div> {
-    let base = div().id(id).flex().flex_none().items_center().w(px(34.)).h(px(18.)).px(px(3.)).cursor_pointer();
+    let base = div()
+        .id(id)
+        .flex()
+        .flex_none()
+        .items_center()
+        .w(px(34.))
+        .h(px(18.))
+        .px(px(3.))
+        .cursor_pointer();
     if on {
-        base.bg(p.accent_bg).justify_end().child(marker(p.accent_on, 12.))
+        base.bg(p.accent_bg)
+            .justify_end()
+            .child(marker(p.accent_on, 12.))
     } else {
-        base.bg(p.bg_raised).border_1().border_color(p.border_strong).child(marker(p.muted, 12.))
+        base.bg(p.bg_raised)
+            .border_1()
+            .border_color(p.border_strong)
+            .child(marker(p.muted, 12.))
     }
 }
 
 /// One cell of a KPI strip: label (with an optional marker) over a value.
-pub fn kpi(name: impl Into<SharedString>, dot: Option<Hsla>, value: impl IntoElement, p: &Palette) -> Div {
+pub fn kpi(
+    name: impl Into<SharedString>,
+    dot: Option<Hsla>,
+    value: impl IntoElement,
+    p: &Palette,
+) -> Div {
     div()
         .flex()
         .flex_col()
@@ -179,17 +266,30 @@ pub fn kpi(name: impl Into<SharedString>, dot: Option<Hsla>, value: impl IntoEle
         .border_color(p.border)
         .overflow_hidden()
         .child(
-            div().flex().items_center().gap(px(6.)).children(dot.map(|c| marker(c, 6.))).child(label(name, p)),
+            div()
+                .flex()
+                .items_center()
+                .gap(px(6.))
+                .children(dot.map(|c| marker(c, 6.)))
+                .child(label(name, p)),
         )
         .child(value)
 }
 
 pub fn kpi_value(text: impl Into<SharedString>, p: &Palette) -> Div {
-    div().title().text_color(p.text).whitespace_nowrap().child(text.into())
+    div()
+        .title()
+        .text_color(p.text)
+        .whitespace_nowrap()
+        .child(text.into())
 }
 
 /// A value with a unit beside it: "91 RUN 6", "41 ISSUES".
-pub fn kpi_value_unit(value: impl Into<SharedString>, unit: impl Into<SharedString>, p: &Palette) -> Div {
+pub fn kpi_value_unit(
+    value: impl Into<SharedString>,
+    unit: impl Into<SharedString>,
+    p: &Palette,
+) -> Div {
     div()
         .flex()
         .items_baseline()
@@ -199,9 +299,18 @@ pub fn kpi_value_unit(value: impl Into<SharedString>, unit: impl Into<SharedStri
 }
 
 /// Top bar tab: label over a 2px underline that is accent when active.
-pub fn top_tab(id: impl Into<ElementId>, text: &'static str, active: bool, p: &Palette) -> Stateful<Div> {
+pub fn top_tab(
+    id: impl Into<ElementId>,
+    text: &'static str,
+    active: bool,
+    p: &Palette,
+) -> Stateful<Div> {
     let label = div().whitespace_nowrap().child(text);
-    let label = if active { label.small_medium().text_color(p.text) } else { label.small().text_color(p.muted) };
+    let label = if active {
+        label.small_medium().text_color(p.text)
+    } else {
+        label.small().text_color(p.muted)
+    };
     div()
         .id(id)
         .flex()
@@ -216,9 +325,18 @@ pub fn top_tab(id: impl Into<ElementId>, text: &'static str, active: bool, p: &P
 }
 
 /// Detail tab: "Findings 9".
-pub fn detail_tab(id: impl Into<ElementId>, text: String, active: bool, p: &Palette) -> Stateful<Div> {
+pub fn detail_tab(
+    id: impl Into<ElementId>,
+    text: String,
+    active: bool,
+    p: &Palette,
+) -> Stateful<Div> {
     let label = div().whitespace_nowrap().child(text);
-    let label = if active { label.small_medium().text_color(p.text) } else { label.small().text_color(p.muted) };
+    let label = if active {
+        label.small_medium().text_color(p.text)
+    } else {
+        label.small().text_color(p.muted)
+    };
     div()
         .id(id)
         .flex()
@@ -231,7 +349,13 @@ pub fn detail_tab(id: impl Into<ElementId>, text: String, active: bool, p: &Pale
 
 /// 2px accent edge on the left of a selected row.
 pub fn edge(p: &Palette) -> Div {
-    div().absolute().left_0().top_0().bottom_0().w(px(2.)).bg(p.accent_bg)
+    div()
+        .absolute()
+        .left_0()
+        .top_0()
+        .bottom_0()
+        .w(px(2.))
+        .bg(p.accent_bg)
 }
 
 /// Search field: icon, input and the key that focuses it. Border turns accent when focused.
@@ -250,7 +374,13 @@ pub fn search_box(input: &Entity<InputState>, key: &'static str, window: &Window
         .border_1()
         .border_color(if focused { p.accent_text } else { p.border })
         .child(icon("icons/search.svg", 14., 14., p.muted))
-        .child(div().flex_1().min_w_0().body().child(Input::new(input).appearance(false).px_0()))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .body()
+                .child(Input::new(input).appearance(false).px_0()),
+        )
         .child(
             div()
                 .flex_none()
@@ -295,7 +425,11 @@ pub fn field(name: &'static str, input: &Entity<InputState>, window: &Window, cx
 }
 
 /// Closed select: "Overall  v".
-pub fn select_box(id: impl Into<ElementId>, text: impl Into<SharedString>, p: &Palette) -> Stateful<Div> {
+pub fn select_box(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    p: &Palette,
+) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -308,7 +442,13 @@ pub fn select_box(id: impl Into<ElementId>, text: impl Into<SharedString>, p: &P
         .border_1()
         .border_color(p.border)
         .cursor_pointer()
-        .child(div().mono_small().text_color(p.text).whitespace_nowrap().child(text.into()))
+        .child(
+            div()
+                .mono_small()
+                .text_color(p.text)
+                .whitespace_nowrap()
+                .child(text.into()),
+        )
         .child(micro("V", p.muted))
 }
 
@@ -332,7 +472,12 @@ pub fn select_menu(items: Vec<AnyElement>, p: &Palette) -> impl IntoElement {
     .with_priority(1)
 }
 
-pub fn select_item(id: impl Into<ElementId>, text: impl Into<SharedString>, active: bool, p: &Palette) -> Stateful<Div> {
+pub fn select_item(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    active: bool,
+    p: &Palette,
+) -> Stateful<Div> {
     div()
         .id(id)
         .px(px(10.))

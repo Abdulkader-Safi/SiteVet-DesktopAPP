@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use sitevet::{AuditReport, Finding, FindingRef, Metric, MetricBody, MetricCell, PageResult, Status, ValueStatus};
+use sitevet::{
+    AuditReport, Finding, FindingRef, Metric, MetricBody, MetricCell, PageResult, Status,
+    ValueStatus,
+};
 
 use crate::app::{AppView, DetailTab, PageSort, Tab};
 use crate::data::{self, category_name};
@@ -14,7 +17,9 @@ use crate::ui;
 
 impl AppView {
     pub fn render_report(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let Some(site) = self.site() else { return div().into_any_element() };
+        let Some(site) = self.site() else {
+            return div().into_any_element();
+        };
         let report = site.latest.clone();
         match self.tab {
             Tab::Pages => self.render_pages(&report, window, cx).into_any_element(),
@@ -34,7 +39,12 @@ impl AppView {
                 let n = site.and_then(|s| c.baseline.run_id.and_then(|id| s.run_number(id)));
                 (
                     n.map_or("SINCE LAST RUN".to_string(), |n| format!("SINCE RUN {n}")),
-                    format!("{} · {} FIXED · {} NEW", data::signed(c.score_change.into()), c.fixed.len(), c.new_failures.len()),
+                    format!(
+                        "{} · {} FIXED · {} NEW",
+                        data::signed(c.score_change.into()),
+                        c.fixed.len(),
+                        c.new_failures.len()
+                    ),
                 )
             }
             None => ("SINCE LAST RUN".to_string(), "FIRST RUN".to_string()),
@@ -71,14 +81,38 @@ impl AppView {
                             .child(ui::badge(word, band)),
                     ),
             )
-            .child(ui::kpi("FAIL", Some(p.fail), ui::kpi_value(data::thousands(fail.into()), &p), &p))
-            .child(ui::kpi("WARN", Some(p.warn), ui::kpi_value(data::thousands(warn.into()), &p), &p))
-            .child(ui::kpi("PASS", Some(p.pass), ui::kpi_value(data::thousands(pass.into()), &p), &p))
-            .child(ui::kpi("PAGES", Some(p.skip), ui::kpi_value(report.pages.len().to_string(), &p), &p))
+            .child(ui::kpi(
+                "FAIL",
+                Some(p.fail),
+                ui::kpi_value(data::thousands(fail.into()), &p),
+                &p,
+            ))
+            .child(ui::kpi(
+                "WARN",
+                Some(p.warn),
+                ui::kpi_value(data::thousands(warn.into()), &p),
+                &p,
+            ))
+            .child(ui::kpi(
+                "PASS",
+                Some(p.pass),
+                ui::kpi_value(data::thousands(pass.into()), &p),
+                &p,
+            ))
+            .child(ui::kpi(
+                "PAGES",
+                Some(p.skip),
+                ui::kpi_value(report.pages.len().to_string(), &p),
+                &p,
+            ))
             .child(ui::kpi(
                 since_label,
                 Some(p.accent_text),
-                div().mono_small().text_color(p.text).whitespace_nowrap().child(since_value),
+                div()
+                    .mono_small()
+                    .text_color(p.text)
+                    .whitespace_nowrap()
+                    .child(since_value),
                 &p,
             ))
             .child(ui::kpi(
@@ -91,21 +125,39 @@ impl AppView {
 
     // ---- Pages ----
 
-    fn render_pages(&mut self, report: &Arc<AuditReport>, window: &mut Window, cx: &mut Context<Self>) -> Div {
+    fn render_pages(
+        &mut self,
+        report: &Arc<AuditReport>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Div {
         let p = cx.pal();
         let cat_query = self.category_search.read(cx).value().to_lowercase();
         let page_query = self.page_search.read(cx).value().to_lowercase();
 
         // Categories, worst first.
         let mut cats: Vec<_> = report.categories.iter().collect();
-        cats.sort_by_key(|c| (c.score, std::cmp::Reverse(c.fail), std::cmp::Reverse(c.warn)));
+        cats.sort_by_key(|c| {
+            (
+                c.score,
+                std::cmp::Reverse(c.fail),
+                std::cmp::Reverse(c.warn),
+            )
+        });
         let mut cat_rows: Vec<AnyElement> = vec![
-            category_row("all", "All categories".into(), None, report.score, self.category.is_none(), &p)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.category = None;
-                    cx.notify();
-                }))
-                .into_any_element(),
+            category_row(
+                "all",
+                "All categories".into(),
+                None,
+                report.score,
+                self.category.is_none(),
+                &p,
+            )
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.category = None;
+                cx.notify();
+            }))
+            .into_any_element(),
         ];
         for c in cats {
             let name = category_name(&c.category);
@@ -120,13 +172,20 @@ impl AppView {
             let active = self.category.as_deref() == Some(c.category.as_str());
             let id = c.category.clone();
             cat_rows.push(
-                category_row(SharedString::from(c.category.clone()), name, Some(count), c.score, active, &p)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.category = Some(id.clone());
-                        this.page = None;
-                        cx.notify();
-                    }))
-                    .into_any_element(),
+                category_row(
+                    SharedString::from(c.category.clone()),
+                    name,
+                    Some(count),
+                    c.score,
+                    active,
+                    &p,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.category = Some(id.clone());
+                    this.page = None;
+                    cx.notify();
+                }))
+                .into_any_element(),
             );
         }
 
@@ -137,13 +196,20 @@ impl AppView {
             .iter()
             .filter(|pg| {
                 self.category.is_none()
-                    || pg.findings.iter().any(|f| in_cat(f) && matches!(f.status, Status::Fail | Status::Warn))
+                    || pg
+                        .findings
+                        .iter()
+                        .any(|f| in_cat(f) && matches!(f.status, Status::Fail | Status::Warn))
             })
             .filter(|pg| page_query.is_empty() || pg.url.to_lowercase().contains(&page_query))
             .collect();
         match self.page_sort {
-            PageSort::Lowest => pages.sort_by(|a, b| a.score.cmp(&b.score).then_with(|| a.url.cmp(&b.url))),
-            PageSort::Path => pages.sort_by(|a, b| data::path_of(&a.url).cmp(&data::path_of(&b.url))),
+            PageSort::Lowest => {
+                pages.sort_by(|a, b| a.score.cmp(&b.score).then_with(|| a.url.cmp(&b.url)))
+            }
+            PageSort::Path => {
+                pages.sort_by_key(|a| data::path_of(&a.url))
+            }
         }
         let selected = self
             .page
@@ -158,14 +224,19 @@ impl AppView {
                 let issues = data::page_issues(pg);
                 let url = pg.url.clone();
                 let active = selected.is_some_and(|s| s.url == pg.url);
-                list_row(data::path_of(&pg.url), data::issues_label(&issues), ui::score_chip(pg.score, &p), &p)
-                    .id(("page", i))
-                    .when(active, |d| d.bg(p.bg_raised).child(ui::edge(&p)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.page = Some(url.clone());
-                        cx.notify();
-                    }))
-                    .into_any_element()
+                list_row(
+                    data::path_of(&pg.url),
+                    data::issues_label(&issues),
+                    ui::score_chip(pg.score, &p),
+                    &p,
+                )
+                .id(("page", i))
+                .when(active, |d| d.bg(p.bg_raised).child(ui::edge(&p)))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.page = Some(url.clone());
+                    cx.notify();
+                }))
+                .into_any_element()
             })
             .collect();
 
@@ -178,9 +249,32 @@ impl AppView {
             .bg(p.bg_sunken)
             .border_r_1()
             .border_color(p.border)
-            .child(div().flex_none().pt(px(16.)).pb(px(8.)).px(px(16.)).child(ui::label("CATEGORIES", &p)))
-            .child(div().flex().flex_none().pb(px(12.)).px(px(12.)).child(ui::search_box(&self.category_search, "c", window, cx)))
-            .child(div().id("cat-list").flex().flex_col().flex_1().min_h_0().overflow_y_scroll().children(cat_rows));
+            .child(
+                div()
+                    .flex_none()
+                    .pt(px(16.))
+                    .pb(px(8.))
+                    .px(px(16.))
+                    .child(ui::label("CATEGORIES", &p)),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_none()
+                    .pb(px(12.))
+                    .px(px(12.))
+                    .child(ui::search_box(&self.category_search, "c", window, cx)),
+            )
+            .child(
+                div()
+                    .id("cat-list")
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .children(cat_rows),
+            );
 
         let sort = self.page_sort;
         let page_pane = div()
@@ -201,18 +295,21 @@ impl AppView {
                     .py(px(12.))
                     .child(ui::label(format!("{} PAGES", pages.len()), &p))
                     .child(ui::spacer())
-                    .child(ui::chip("sort-score", "Lowest score", sort == PageSort::Lowest, &p).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.page_sort = PageSort::Lowest;
-                            cx.notify();
-                        },
-                    )))
-                    .child(ui::chip("sort-path", "Path", sort == PageSort::Path, &p).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.page_sort = PageSort::Path;
-                            cx.notify();
-                        },
-                    ))),
+                    .child(
+                        ui::chip("sort-score", "Lowest score", sort == PageSort::Lowest, &p)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.page_sort = PageSort::Lowest;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        ui::chip("sort-path", "Path", sort == PageSort::Path, &p).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.page_sort = PageSort::Path;
+                                cx.notify();
+                            }),
+                        ),
+                    ),
             )
             .child(
                 div()
@@ -224,7 +321,16 @@ impl AppView {
                     .border_color(p.border)
                     .child(ui::search_box(&self.page_search, "/", window, cx)),
             )
-            .child(div().id("page-list").flex().flex_col().flex_1().min_h_0().overflow_y_scroll().children(page_rows));
+            .child(
+                div()
+                    .id("page-list")
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .children(page_rows),
+            );
 
         div()
             .flex()
@@ -244,16 +350,34 @@ impl AppView {
 
     fn page_detail(&self, page: Option<&PageResult>, cx: &mut Context<Self>) -> Div {
         let p = cx.pal();
-        let pane = div().flex().flex_col().flex_1().min_w_0().h_full().gap(px(12.)).px(px(24.)).py(px(20.));
+        let pane = div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .gap(px(12.))
+            .px(px(24.))
+            .py(px(20.));
         let Some(page) = page else {
             return pane.child(div().body().text_color(p.muted).child("No pages match."));
         };
         let in_cat = |cat: &str| self.category.as_deref().is_none_or(|c| c == cat);
-        let issues: Vec<&Finding> =
-            page.findings.iter().filter(|f| f.status != Status::Pass && in_cat(&f.category)).collect();
-        let passed: Vec<&Finding> =
-            page.findings.iter().filter(|f| f.status == Status::Pass && in_cat(&f.category)).collect();
-        let metrics: Vec<&Metric> = page.metrics.iter().filter(|m| in_cat(&m.category)).collect();
+        let issues: Vec<&Finding> = page
+            .findings
+            .iter()
+            .filter(|f| f.status != Status::Pass && in_cat(&f.category))
+            .collect();
+        let passed: Vec<&Finding> = page
+            .findings
+            .iter()
+            .filter(|f| f.status == Status::Pass && in_cat(&f.category))
+            .collect();
+        let metrics: Vec<&Metric> = page
+            .metrics
+            .iter()
+            .filter(|m| in_cat(&m.category))
+            .collect();
         let meta = format!(
             "{} · DEPTH {} · {} MS · {} KB",
             page.status,
@@ -263,13 +387,25 @@ impl AppView {
         );
         let tabs = [
             (DetailTab::Findings, format!("Findings {}", issues.len())),
-            (DetailTab::Measurements, format!("Measurements {}", metrics.len())),
+            (
+                DetailTab::Measurements,
+                format!("Measurements {}", metrics.len()),
+            ),
             (DetailTab::Passed, format!("Passed {}", passed.len())),
         ];
         let items: Vec<AnyElement> = match self.detail {
-            DetailTab::Findings => issues.iter().map(|f| finding_card(f, &p).into_any_element()).collect(),
-            DetailTab::Passed => passed.iter().map(|f| finding_card(f, &p).into_any_element()).collect(),
-            DetailTab::Measurements => metrics.iter().map(|m| metric_card(m, &p).into_any_element()).collect(),
+            DetailTab::Findings => issues
+                .iter()
+                .map(|f| finding_card(f, &p).into_any_element())
+                .collect(),
+            DetailTab::Passed => passed
+                .iter()
+                .map(|f| finding_card(f, &p).into_any_element())
+                .collect(),
+            DetailTab::Measurements => metrics
+                .iter()
+                .map(|m| metric_card(m, &p).into_any_element())
+                .collect(),
         };
         let empty = items.is_empty();
         pane.child(
@@ -279,22 +415,34 @@ impl AppView {
                 .items_center()
                 .gap(px(10.))
                 .child(ui::score_chip(page.score, &p))
-                .child(div().mono().text_color(p.text).truncate().child(data::path_of(&page.url)))
+                .child(
+                    div()
+                        .mono()
+                        .text_color(p.text)
+                        .truncate()
+                        .child(data::path_of(&page.url)),
+                )
                 .child(ui::spacer())
                 .child(ui::micro(meta, p.muted)),
         )
-        .when_some(page.error.clone(), |d, e| d.child(div().small().text_color(p.fail).child(e)))
+        .when_some(page.error.clone(), |d, e| {
+            d.child(div().small().text_color(p.fail).child(e))
+        })
         .child(
-            div().flex().flex_none().gap(px(16.)).border_b_1().border_color(p.border).children(tabs.into_iter().map(
-                |(tab, text)| {
-                    ui::detail_tab(text.clone(), text, self.detail == tab, &p).on_click(cx.listener(
-                        move |this, _, _, cx| {
+            div()
+                .flex()
+                .flex_none()
+                .gap(px(16.))
+                .border_b_1()
+                .border_color(p.border)
+                .children(tabs.into_iter().map(|(tab, text)| {
+                    ui::detail_tab(text.clone(), text, self.detail == tab, &p).on_click(
+                        cx.listener(move |this, _, _, cx| {
                             this.detail = tab;
                             cx.notify();
-                        },
-                    ))
-                },
-            )),
+                        }),
+                    )
+                })),
         )
         .child(
             div()
@@ -306,7 +454,9 @@ impl AppView {
                 .gap(px(12.))
                 .overflow_y_scroll()
                 .children(items)
-                .when(empty, |d| d.child(div().body().text_color(p.muted).child("Nothing here."))),
+                .when(empty, |d| {
+                    d.child(div().body().text_color(p.muted).child("Nothing here."))
+                }),
         )
     }
 
@@ -324,16 +474,34 @@ impl AppView {
                 .py(px(8.))
                 .border_b_1()
                 .border_color(p.border)
-                .child(div().w(px(180.)).body().text_color(p.text).child(category_name(&c.category)))
-                .child(div().flex_1().child(ui::progress_bar(c.score as f32 / 100., None, &p)))
-                .child(ui::micro(format!("{} FAIL · {} WARN · {} PASS", c.fail, c.warn, c.pass), p.muted))
+                .child(
+                    div()
+                        .w(px(180.))
+                        .body()
+                        .text_color(p.text)
+                        .child(category_name(&c.category)),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .child(ui::progress_bar(c.score as f32 / 100., None, &p)),
+                )
+                .child(ui::micro(
+                    format!("{} FAIL · {} WARN · {} PASS", c.fail, c.warn, c.pass),
+                    p.muted,
+                ))
                 .child(ui::score_chip(c.score, &p))
         });
         let skipped = report.skipped_rules.iter().map(|s| {
             div()
                 .flex()
                 .gap(px(8.))
-                .child(div().mono_small().text_color(p.text).child(s.rule_id.clone()))
+                .child(
+                    div()
+                        .mono_small()
+                        .text_color(p.text)
+                        .child(s.rule_id.clone()),
+                )
                 .child(ui::spacer())
                 .child(div().small().text_color(p.muted).child(s.reason.clone()))
         });
@@ -353,7 +521,11 @@ impl AppView {
                     .px(px(24.))
                     .py(px(20.))
                     .gap(px(20.))
-                    .child(card(&p).child(div().title().child("Categories")).child(div().flex().flex_col().children(rows)))
+                    .child(
+                        card(&p)
+                            .child(div().title().child("Categories"))
+                            .child(div().flex().flex_col().children(rows)),
+                    )
                     .when(!report.skipped_rules.is_empty(), |d| {
                         d.child(
                             card(&p)
@@ -374,11 +546,18 @@ impl AppView {
             _ => 2,
         });
         let cards = findings.into_iter().map(|sf| {
-            let urls = sf.urls.iter().take(8).map(|u| div().mono_small().text_color(p.muted).child(data::path_of(u)));
+            let urls = sf.urls.iter().take(8).map(|u| {
+                div()
+                    .mono_small()
+                    .text_color(p.muted)
+                    .child(data::path_of(u))
+            });
             let more = sf.urls.len().saturating_sub(8);
             finding_card(&sf.finding, &p)
                 .children(urls)
-                .when(more > 0, |d| d.child(ui::micro(format!("AND {more} MORE"), p.muted)))
+                .when(more > 0, |d| {
+                    d.child(ui::micro(format!("AND {more} MORE"), p.muted))
+                })
         });
         div()
             .flex()
@@ -398,7 +577,12 @@ impl AppView {
                     .gap(px(12.))
                     .children(cards)
                     .when(report.site.findings.is_empty(), |d| {
-                        d.child(div().body().text_color(p.muted).child("This report has no site-wide checks."))
+                        d.child(
+                            div()
+                                .body()
+                                .text_color(p.muted)
+                                .child("This report has no site-wide checks."),
+                        )
                     }),
             )
     }
@@ -410,7 +594,10 @@ impl AppView {
             (true, Some(((a, b), d))) => {
                 let site = self.site();
                 let n = |id| site.and_then(|s| s.run_number(id)).unwrap_or(0);
-                (format!("Run {} to run {}", n(*a), n(*b)), Some((**d).clone()))
+                (
+                    format!("Run {} to run {}", n(*a), n(*b)),
+                    Some((**d).clone()),
+                )
             }
             _ => ("Since the last run".to_string(), report.changes.clone()),
         };
@@ -489,7 +676,13 @@ fn list_row(title: String, sub: String, right: Div, p: &Palette) -> Div {
                 .flex_1()
                 .min_w_0()
                 .gap(px(2.))
-                .child(div().mono_small().text_color(p.text).truncate().child(title))
+                .child(
+                    div()
+                        .mono_small()
+                        .text_color(p.text)
+                        .truncate()
+                        .child(title),
+                )
                 .child(div().mono_micro().text_color(p.muted).truncate().child(sub)),
         )
         .child(right)
@@ -504,7 +697,11 @@ fn category_row(
     p: &Palette,
 ) -> Stateful<Div> {
     let name = div().whitespace_nowrap().truncate().child(name);
-    let name = if active { name.body_medium().text_color(p.text) } else { name.body().text_color(p.muted) };
+    let name = if active {
+        name.body_medium().text_color(p.text)
+    } else {
+        name.body().text_color(p.muted)
+    };
     div()
         .id(id)
         .relative()
@@ -521,7 +718,12 @@ fn category_row(
         .child(name)
         .child(ui::spacer())
         .children(count.map(|(t, c)| ui::micro(t, c)))
-        .child(div().mono_small().text_color(p.text).child(score.to_string()))
+        .child(
+            div()
+                .mono_small()
+                .text_color(p.text)
+                .child(score.to_string()),
+        )
 }
 
 /// Status badge, title, rule ID, message, evidence in a sunken mono block, and the fix.
@@ -542,9 +744,21 @@ pub fn finding_card(f: &Finding, p: &Palette) -> Div {
                 .items_center()
                 .gap(px(8.))
                 .child(ui::status_badge(f.status, p))
-                .child(div().title().text_color(p.text).whitespace_nowrap().child(f.title.clone()))
+                .child(
+                    div()
+                        .title()
+                        .text_color(p.text)
+                        .whitespace_nowrap()
+                        .child(f.title.clone()),
+                )
                 .child(ui::spacer())
-                .child(div().mono_small().text_color(p.muted).whitespace_nowrap().child(f.rule_id.clone())),
+                .child(
+                    div()
+                        .mono_small()
+                        .text_color(p.muted)
+                        .whitespace_nowrap()
+                        .child(f.rule_id.clone()),
+                ),
         )
         .child(div().body().text_color(p.text).child(f.message.clone()))
         .when_some(f.evidence.clone(), |d, e| {
@@ -567,7 +781,14 @@ pub fn finding_card(f: &Finding, p: &Palette) -> Div {
                     .items_start()
                     .gap(px(8.))
                     .child(div().mono_label().text_color(p.accent_text).child("FIX"))
-                    .child(div().flex_1().min_w_0().small().text_color(p.muted).child(fix)),
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .small()
+                            .text_color(p.muted)
+                            .child(fix),
+                    ),
             )
         })
 }
@@ -590,17 +811,34 @@ fn metric_card(m: &Metric, p: &Palette) -> Div {
     let body = match &m.body {
         MetricBody::Value { value, unit } => {
             let v = value.as_ref().map_or("—".to_string(), cell_text);
-            div().mono().text_color(p.text).child(format!("{v} {}", unit.clone().unwrap_or_default()))
+            div()
+                .mono()
+                .text_color(p.text)
+                .child(format!("{v} {}", unit.clone().unwrap_or_default()))
         }
-        MetricBody::Table { columns, rows, total } => {
+        MetricBody::Table {
+            columns,
+            rows,
+            total,
+        } => {
             let cols = columns.len().max(1);
             let row = |cells: Vec<String>, head: bool| {
-                div().flex().gap(px(12.)).children(cells.into_iter().take(cols).map(move |c| {
-                    let d = div().flex_1().min_w_0().truncate().child(c);
-                    if head { d.mono_label().text_color(p.muted) } else { d.mono_small().text_color(p.text) }
-                }))
+                div()
+                    .flex()
+                    .gap(px(12.))
+                    .children(cells.into_iter().take(cols).map(move |c| {
+                        let d = div().flex_1().min_w_0().truncate().child(c);
+                        if head {
+                            d.mono_label().text_color(p.muted)
+                        } else {
+                            d.mono_small().text_color(p.text)
+                        }
+                    }))
             };
-            let shown = rows.iter().take(20).map(|r| row(r.iter().map(cell_text).collect(), false));
+            let shown = rows
+                .iter()
+                .take(20)
+                .map(|r| row(r.iter().map(cell_text).collect(), false));
             let more = (*total as usize).saturating_sub(rows.len().min(20));
             div()
                 .flex()
@@ -608,7 +846,9 @@ fn metric_card(m: &Metric, p: &Palette) -> Div {
                 .gap(px(4.))
                 .child(row(columns.clone(), true))
                 .children(shown)
-                .when(more > 0, |d| d.child(ui::micro(format!("AND {more} MORE"), p.muted)))
+                .when(more > 0, |d| {
+                    d.child(ui::micro(format!("AND {more} MORE"), p.muted))
+                })
         }
         _ => div(),
     };
@@ -633,26 +873,46 @@ fn metric_card(m: &Metric, p: &Palette) -> Div {
                 .child(div().mono_small().text_color(p.muted).child(m.id.clone())),
         )
         .child(body)
-        .when_some(m.note.clone(), |d, n| d.child(div().small().text_color(p.muted).child(n)))
+        .when_some(m.note.clone(), |d, n| {
+            d.child(div().small().text_color(p.muted).child(n))
+        })
 }
 
 /// "41 fixed" with rule IDs and how many pages each touched. `limit` caps the rows.
-pub fn change_list(word: &str, refs: &[FindingRef], color: Hsla, limit: Option<usize>, p: &Palette) -> Div {
+pub fn change_list(
+    word: &str,
+    refs: &[FindingRef],
+    color: Hsla,
+    limit: Option<usize>,
+    p: &Palette,
+) -> Div {
     let mut by_rule: BTreeMap<&str, usize> = BTreeMap::new();
     for r in refs {
         *by_rule.entry(r.rule_id.as_str()).or_default() += 1;
     }
     let mut rules: Vec<_> = by_rule.into_iter().collect();
     rules.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-    let rows = rules.into_iter().take(limit.unwrap_or(usize::MAX)).map(|(rule, n)| {
-        div()
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .child(div().mono_small().text_color(p.text).truncate().child(rule.to_string()))
-            .child(ui::spacer())
-            .child(ui::micro(format!("{n} {}", if n == 1 { "PAGE" } else { "PAGES" }), p.muted))
-    });
+    let rows = rules
+        .into_iter()
+        .take(limit.unwrap_or(usize::MAX))
+        .map(|(rule, n)| {
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .child(
+                    div()
+                        .mono_small()
+                        .text_color(p.text)
+                        .truncate()
+                        .child(rule.to_string()),
+                )
+                .child(ui::spacer())
+                .child(ui::micro(
+                    format!("{n} {}", if n == 1 { "PAGE" } else { "PAGES" }),
+                    p.muted,
+                ))
+        });
     div()
         .flex()
         .flex_col()
@@ -663,7 +923,12 @@ pub fn change_list(word: &str, refs: &[FindingRef], color: Hsla, limit: Option<u
                 .items_center()
                 .gap(px(6.))
                 .child(ui::marker(color, 6.))
-                .child(div().small_medium().text_color(p.text).child(format!("{} {word}", refs.len()))),
+                .child(
+                    div()
+                        .small_medium()
+                        .text_color(p.text)
+                        .child(format!("{} {word}", refs.len())),
+                ),
         )
         .children(rows)
 }

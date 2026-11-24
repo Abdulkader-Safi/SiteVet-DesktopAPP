@@ -36,11 +36,19 @@ fn check(
                 .child(div().body_medium().text_color(p.text).child(title))
                 .child(div().small().text_color(p.muted).child(desc)),
         )
-        .child(ui::toggle(SharedString::from(format!("{id}-toggle")), on, p))
+        .child(ui::toggle(
+            SharedString::from(format!("{id}-toggle")),
+            on,
+            p,
+        ))
 }
 
 impl AppView {
-    pub fn render_new_audit(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render_new_audit(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let p = cx.pal();
         let several = self.form.several;
         let s = &self.form.settings;
@@ -180,8 +188,12 @@ impl AppView {
         // Every control the form offers once expanded.
         let option_count = 4 + 3 + self.form.extras.len() + 3 + usize::from(several);
         let extras = self.form.show_all.then(|| {
-            let fields: Vec<Div> =
-                self.form.extras.iter().map(|e| ui::field(e.name, &e.input, window, cx)).collect();
+            let fields: Vec<Div> = self
+                .form
+                .extras
+                .iter()
+                .map(|e| ui::field(e.name, &e.input, window, cx))
+                .collect();
             let mut grid = div().flex().flex_col().gap(px(16.)).w_full();
             let mut it = fields.into_iter();
             loop {
@@ -191,7 +203,13 @@ impl AppView {
                 }
                 grid = grid.child(div().flex().gap(px(16.)).w_full().children(row));
             }
-            div().flex().flex_col().gap(px(8.)).w_full().child(ui::label("MORE OPTIONS", &p)).child(grid)
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .w_full()
+                .child(ui::label("MORE OPTIONS", &p))
+                .child(grid)
         });
 
         let limits = div()
@@ -201,7 +219,14 @@ impl AppView {
             .child(ui::field("MAX PAGES", &self.form.max_pages, window, cx))
             .child(ui::field("MAX DEPTH", &self.form.max_depth, window, cx))
             .child(ui::field("CONCURRENCY", &self.form.concurrency, window, cx))
-            .when(several, |d| d.child(ui::field("SITES AT A TIME", &self.form.sites_at_a_time, window, cx)));
+            .when(several, |d| {
+                d.child(ui::field(
+                    "SITES AT A TIME",
+                    &self.form.sites_at_a_time,
+                    window,
+                    cx,
+                ))
+            });
 
         let footer_note = match (&self.form.note, several) {
             (Some(n), _) => n.clone(),
@@ -213,7 +238,11 @@ impl AppView {
             (None, true) => self.batch_estimate(cx),
         };
         let run_label = if several {
-            format!("Run {} audit{}", self.form.sites.len(), if self.form.sites.len() == 1 { "" } else { "s" })
+            format!(
+                "Run {} audit{}",
+                self.form.sites.len(),
+                if self.form.sites.len() == 1 { "" } else { "s" }
+            )
         } else {
             "Run audit".into()
         };
@@ -229,7 +258,10 @@ impl AppView {
                 .child(ui::label("START URL", &p))
                 .child(ui::text_field(&self.form.start_url, window, cx))
                 .child(
-                    div().small().text_color(p.muted).child("Same-origin pages only. robots.txt and sitemap.xml are read once."),
+                    div()
+                        .small()
+                        .text_color(p.muted)
+                        .child("Same-origin pages only. robots.txt and sitemap.xml are read once."),
                 )
                 .into_any_element()
         };
@@ -325,7 +357,11 @@ impl AppView {
             .iter()
             .enumerate()
             .map(|(i, url)| {
-                let last = self.sites.iter().find(|s| s.host() == data::host_of(url)).map(|s| s.latest.score);
+                let last = self
+                    .sites
+                    .iter()
+                    .find(|s| s.host() == data::host_of(url))
+                    .map(|s| s.latest.score);
                 div()
                     .flex()
                     .items_center()
@@ -335,9 +371,19 @@ impl AppView {
                     .border_b_1()
                     .border_color(p.border)
                     .child(ui::micro(format!("{:02}", i + 1), p.muted))
-                    .child(div().flex_1().min_w_0().mono().text_color(p.text).truncate().child(url.clone()))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .mono()
+                            .text_color(p.text)
+                            .truncate()
+                            .child(url.clone()),
+                    )
                     .map(|d| match last {
-                        Some(score) => d.child(ui::micro("LAST", p.muted)).child(ui::score_chip(score, &p)),
+                        Some(score) => d
+                            .child(ui::micro("LAST", p.muted))
+                            .child(ui::score_chip(score, &p)),
                         None => d.child(ui::micro("NEW", p.muted)),
                     })
                     .child(
@@ -421,18 +467,36 @@ impl AppView {
     /// "5 SITES · 2 AT A TIME · ABOUT 6 MIN", from each site's last run time.
     fn batch_estimate(&self, cx: &App) -> String {
         let n = self.form.sites.len();
-        let parallel: usize = self.form.sites_at_a_time.read(cx).value().trim().parse().unwrap_or(1).max(1);
+        let parallel: usize = self
+            .form
+            .sites_at_a_time
+            .read(cx)
+            .value()
+            .trim()
+            .parse()
+            .unwrap_or(1)
+            .max(1);
         let known: Vec<u64> = self.sites.iter().map(|s| s.latest.duration_ms).collect();
-        let fallback = if known.is_empty() { 60_000 } else { known.iter().sum::<u64>() / known.len() as u64 };
+        let fallback = if known.is_empty() {
+            60_000
+        } else {
+            known.iter().sum::<u64>() / known.len() as u64
+        };
         let total: u64 = self
             .form
             .sites
             .iter()
             .map(|u| {
-                self.sites.iter().find(|s| s.host() == data::host_of(u)).map_or(fallback, |s| s.latest.duration_ms)
+                self.sites
+                    .iter()
+                    .find(|s| s.host() == data::host_of(u))
+                    .map_or(fallback, |s| s.latest.duration_ms)
             })
             .sum();
         let minutes = (total / parallel as u64).div_ceil(60_000).max(1);
-        format!("{n} SITES · {parallel} AT A TIME · ABOUT {minutes} MIN")
+        format!(
+            "{n} SITE{} · {parallel} AT A TIME · ABOUT {minutes} MIN",
+            if n == 1 { "" } else { "S" }
+        )
     }
 }
