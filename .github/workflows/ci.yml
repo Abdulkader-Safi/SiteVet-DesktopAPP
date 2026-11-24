@@ -7,6 +7,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch or PR cancels the older run. macOS runners are scarce, and
+# a release pushes to main twice in a minute (merge, then version bump): two runs queued for
+# macOS at once, plus the release build, and GitHub dropped one after 15 minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     strategy:
