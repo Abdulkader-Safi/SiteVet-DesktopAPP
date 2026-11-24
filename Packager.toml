@@ -1,0 +1,28 @@
+# cargo-packager config: macOS .app and .dmg, Windows NSIS installer, Linux AppImage.
+# Run `cargo packager --release` on the OS you are packaging for. Builds are unsigned.
+name = "sitevet-desktop"
+product-name = "SiteVet"
+version = "0.1.0"
+identifier = "com.abdulkadersafi.sitevet"
+description = "Desktop app for the sitevet website audit engine."
+authors = ["Abdulkader Safi"]
+homepage = "https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP"
+license-file = "LICENSE"
+copyright = "Copyright (c) 2026 Abdulkader Safi"
+category = "DeveloperTool"
+before-packaging-command = "cargo build --release"
+out-dir = "dist"
+binaries-dir = "target/release"
+binaries = [{ path = "sitevet-desktop", main = true }]
+icons = ["assets/app/icon.icns", "assets/app/icon.ico", "assets/app/icon.png"]
+# THIRD_PARTY_LICENSES.html is generated: see the README, "Build a release".
+resources = ["LICENSE", "THIRD_PARTY_LICENSES.html"]
+
+[macos]
+minimum-system-version = "13.0"
+# Ad-hoc signature. Not notarised, so a downloaded copy still needs "Open Anyway" once.
+signing-identity = "-"
+
+[nsis]
+# Per-user install: no administrator rights needed.
+installer-mode = "currentUser"

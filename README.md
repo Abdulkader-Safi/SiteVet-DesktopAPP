@@ -4,6 +4,18 @@ A desktop app for [sitevet](https://crates.io/crates/sitevet), the Rust website 
 
 Built with GPUI through [GPUI Kit](https://gpui-kit.com) (`gpui-kit` 0.11). The score chart is GPUI Kit's own `LineChart`.
 
+![The Pages tab: categories, pages worst first, and the findings for the selected page](docs/screenshots/pages.png)
+
+![History: overall score by run, a compare of two runs, and the run list](docs/screenshots/history.png)
+
+## Download
+
+Get the installer for your system from [Releases](https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP/releases): a `.dmg` for macOS (Apple silicon), a `-setup.exe` for Windows, or an `.AppImage` for Linux.
+
+The builds are not code-signed yet. On macOS, open System Settings, Privacy & Security and click "Open Anyway" the first time, or run `xattr -dr com.apple.quarantine /Applications/SiteVet.app`. On Windows, click "More info" and then "Run anyway" when SmartScreen stops it.
+
+When a newer release is out, the app shows a small card in the bottom-right corner on start. Download opens the installer for your system in the browser.
+
 ## What works
 
 - New audit for one site, or a list of sites run two (or any number) at a time.
@@ -16,12 +28,19 @@ Built with GPUI through [GPUI Kit](https://gpui-kit.com) (`gpui-kit` 0.11). The 
 
 Export is planned. Its icon sits in the top bar but does nothing yet.
 
-## Run it
+## Run from source
 
 You need Rust 1.100 or newer. `rust-toolchain.toml` pins it, so rustup installs it on the first build. GPUI's macOS crate uses `Option::map_or_default`, which older compilers reject.
 
 ```sh
 cargo run --release
+```
+
+Or install the binary without cloning:
+
+```sh
+cargo +1.100.0 install --git https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP --locked
+sitevet-desktop
 ```
 
 Rendered checks (axe-core and Core Web Vitals) need Chrome installed. Turn them on under Checks in the new audit form.
@@ -47,6 +66,7 @@ src/
 assets/
   fonts/         Schibsted Grotesk, JetBrains Mono, Saira Stencil One (OFL)
   icons/         the design's SVG icons
+  app/           the app icon (app-icon.svg and the files made from it)
 ```
 
 ```sh
@@ -54,6 +74,21 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
+## Build a release
+
+```sh
+cargo install cargo-packager --version 0.11.8 --locked
+cargo install cargo-about --locked --features cli
+cargo about generate about.hbs -o THIRD_PARTY_LICENSES.html
+cargo packager --release -c Packager.toml
+```
+
+This makes a `.app` and `.dmg` on macOS, an NSIS installer on Windows and an AppImage on Linux, in `dist/`.
+
+To publish one, add a `## vX.Y.Z` section to `docs/releases.md`, bump `version` in `Cargo.toml` and `Packager.toml`, commit, then push a tag: `git tag v0.1.0 && git push origin v0.1.0`. GitHub Actions builds on all three systems and attaches the installers to a release, with that section of `docs/releases.md` as its notes.
+
+The app icon comes from `assets/app/app-icon.svg`. After editing it, run `scripts/app-icon.sh` to rebuild the `.icns`, `.ico` and `.png`.
+
 ## Licence
 
-The fonts in `assets/fonts` are under the SIL Open Font License; their licence files sit beside them.
+SiteVet is MIT licensed (see `LICENSE`). The fonts in `assets/fonts` are under the SIL Open Font License; their licence files sit beside them.

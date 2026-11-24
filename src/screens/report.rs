@@ -207,9 +207,7 @@ impl AppView {
             PageSort::Lowest => {
                 pages.sort_by(|a, b| a.score.cmp(&b.score).then_with(|| a.url.cmp(&b.url)))
             }
-            PageSort::Path => {
-                pages.sort_by_key(|a| data::path_of(&a.url))
-            }
+            PageSort::Path => pages.sort_by_key(|a| data::path_of(&a.url)),
         }
         let selected = self
             .page

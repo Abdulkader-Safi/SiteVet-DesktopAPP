@@ -195,6 +195,8 @@ pub struct AppView {
     pub runs: Vec<LiveRun>,
     pub batch: Option<Batch>,
     ticking: bool,
+    /// A newer release, until the popup is dismissed.
+    pub update: Option<crate::update::Update>,
 }
 
 fn input(
@@ -402,8 +404,19 @@ impl AppView {
             runs: Vec::new(),
             batch: None,
             ticking: false,
+            update: None,
         };
         this.reload_sites(None, cx);
+        let check = cx.background_spawn(async { crate::update::check() });
+        cx.spawn(async move |this, cx| {
+            if let Some(update) = check.await {
+                let _ = this.update(cx, |app, cx| {
+                    app.update = Some(update);
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
         this
     }
 
@@ -1309,6 +1322,7 @@ impl Render for AppView {
             .bg(p.bg_app)
             .text_color(p.text)
             .font_family(theme::SANS)
+            .relative()
             .when(self.sidebar, |d| d.child(self.site_pane(window, cx)))
             .child(
                 div()
@@ -1321,5 +1335,88 @@ impl Render for AppView {
                     .child(self.top_bar(cx))
                     .child(div().flex().flex_col().flex_1().min_h_0().child(body)),
             )
+            .children(self.update_popup(cx))
+    }
+}
+
+impl AppView {
+    /// Bottom-right card when GitHub has a newer release. Download opens the installer for
+    /// this OS in the browser; Later hides the card until the next start.
+    fn update_popup(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        let update = self.update.clone()?;
+        let p = cx.pal();
+        let url = update.url.clone();
+        Some(
+            div()
+                .id("update")
+                .absolute()
+                .right(px(16.))
+                .bottom(px(16.))
+                .w(px(320.))
+                .flex()
+                .flex_col()
+                .gap(px(10.))
+                .p(px(16.))
+                .bg(p.bg_surface)
+                .border_1()
+                .border_color(p.border_strong)
+                .occlude()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(6.))
+                        .child(ui::marker(p.accent_bg, 6.))
+                        .child(ui::label("UPDATE", &p))
+                        .child(ui::spacer())
+                        .child(
+                            div()
+                                .id("update-close")
+                                .px(px(4.))
+                                .small()
+                                .text_color(p.muted)
+                                .cursor_pointer()
+                                .hover(|s| s.text_color(p.text))
+                                .child("×")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.update = None;
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(
+                    div()
+                        .title()
+                        .text_color(p.text)
+                        .child(format!("SiteVet {} is out", update.version)),
+                )
+                .child(div().small().text_color(p.muted).child(format!(
+                    "You have {}. The download opens in your browser.",
+                    env!("CARGO_PKG_VERSION")
+                )))
+                .child(
+                    div()
+                        .flex()
+                        .gap(px(8.))
+                        .pt(px(4.))
+                        .child(
+                            ui::button_primary("update-download", "Download", 32., &p).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    cx.open_url(&url);
+                                    this.update = None;
+                                    cx.notify();
+                                }),
+                            ),
+                        )
+                        .child(
+                            ui::button_secondary("update-later", "Later", 32., &p).on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.update = None;
+                                    cx.notify();
+                                }),
+                            ),
+                        ),
+                ),
+        )
     }
 }

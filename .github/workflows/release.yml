@@ -1,0 +1,66 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            format: dmg
+            artifact: dist/*.dmg
+          - os: windows-latest
+            format: nsis
+            artifact: dist/*-setup.exe
+          - os: ubuntu-22.04
+            format: appimage
+            artifact: dist/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: "1.100.0"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: GPUI system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev \
+            libwayland-dev libfontconfig1-dev libfreetype6-dev libfuse2
+      - name: Packaging tools
+        run: |
+          cargo install cargo-packager --version 0.11.8 --locked
+          cargo install cargo-about --locked --features cli
+      # The notices file is listed in Packager.toml, so it must exist before packaging.
+      - name: Third-party licences
+        run: cargo about generate about.hbs -o THIRD_PARTY_LICENSES.html
+      - name: Package
+        run: cargo packager --release -c Packager.toml --formats ${{ matrix.format }}
+      # The notes for this tag are its section of docs/releases.md (empty if there is none).
+      - name: Release notes
+        shell: bash
+        run: |
+          awk -v tag="${GITHUB_REF_NAME}" '
+            /^## / { on = (index($0, "## " tag " ") == 1 || $0 == "## " tag); next }
+            on' docs/releases.md > release-notes.md
+          cat >> release-notes.md <<'NOTES'
+
+          ### First launch
+
+          The builds are not code-signed yet.
+
+          - macOS says it "could not verify" SiteVet. Click Done, then open System Settings, Privacy & Security, scroll down and click "Open Anyway". Or run `xattr -dr com.apple.quarantine /Applications/SiteVet.app` once.
+          - Windows SmartScreen says it protected your PC. Click "More info", then "Run anyway".
+          NOTES
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: ${{ matrix.artifact }}
+          body_path: release-notes.md
+          generate_release_notes: true
