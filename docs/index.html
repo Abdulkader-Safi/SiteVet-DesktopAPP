@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SiteVet: free desktop website audit for SEO and accessibility</title>
+    <meta
+      name="description"
+      content="SiteVet is a free, open-source desktop app that crawls a website and runs 105 SEO, accessibility, security and performance checks on every page. It keeps every run, so you can see the score change. macOS, Windows and Linux."
+    />
+    <meta property="og:title" content="SiteVet: free desktop website audit for SEO and accessibility" />
+    <meta
+      property="og:description"
+      content="105 checks on every page, run from your own computer. Every run is kept, so you can see whether a fix moved the score."
+    />
+    <meta property="og:image" content="https://abdulkader-safi.github.io/SiteVet-DesktopAPP/img/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SiteVet: audit a website on your own machine. The app's page report next to the headline." />
+    <meta property="og:url" content="https://abdulkader-safi.github.io/SiteVet-DesktopAPP/" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://abdulkader-safi.github.io/SiteVet-DesktopAPP/img/og.png" />
+    <meta name="theme-color" content="#0B0B0C" />
+    <link rel="icon" type="image/svg+xml" href="img/icon.svg" />
+    <link rel="apple-touch-icon" href="img/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Saira+Stencil+One&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script src="theme.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav-bar">
+        <a class="brand" href="#top" aria-label="SiteVet home">
+          <img src="img/icon.svg" width="28" height="28" alt="" />
+          SITEVET
+        </a>
+        <nav class="nav-links" aria-label="Sections">
+          <a href="#features">Features</a>
+          <a href="#screens">Screens</a>
+          <a href="#how">How it works</a>
+          <a href="#download">Download</a>
+          <a href="releases.html">Releases</a>
+        </nav>
+        <div class="nav-right">
+          <span class="ver" data-version>v0.3.0</span>
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch to light theme">
+            <svg class="only-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+              <circle cx="8" cy="8" r="2.7" />
+              <path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9" />
+            </svg>
+            <svg class="only-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+              <path d="M8.3 2a6 6 0 1 0 5.7 7.8A4.7 4.7 0 0 1 8.3 2Z" />
+            </svg>
+          </button>
+          <a class="btn" href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP" aria-label="SiteVet on GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" />
+            </svg>
+            <span>GitHub</span>
+          </a>
+          <a class="btn btn-lime" href="#download">Download</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="wrap">
+          <h1>Audit every page of your website from <em>your desktop</em></h1>
+          <p class="hero-sub">See which pages fail 105 SEO and accessibility checks, and whether your fixes worked.</p>
+          <div class="hero-cta">
+            <a class="btn btn-lime" href="#download" data-primary>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true">
+                <path d="M12 4v12M6 11l6 6 6-6M4 20h16" />
+              </svg>
+              <span data-primary-label>Download free</span>
+            </a>
+            <a class="btn" href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP">Read the source on GitHub</a>
+          </div>
+          <p class="hero-terms cap"><span class="sq"></span>Free and open source · No account · macOS, Windows and Linux</p>
+          <div class="shot hero-shot">
+            <!-- The system theme picks the image with no script; a saved site theme overrides it. Only one downloads. -->
+            <picture>
+              <source id="hero-light" media="(prefers-color-scheme: light)" srcset="img/pages-light.webp" />
+              <script>
+                (function (src) {
+                  var t = document.documentElement.dataset.theme;
+                  src.media = t === "light" ? "all" : "not all";
+                })(document.getElementById("hero-light"));
+              </script>
+              <img
+                id="hero-img"
+                src="img/pages-dark.webp"
+                width="1512"
+                height="1014"
+                fetchpriority="high"
+                alt="SiteVet's report: the overall score of 93 with fail, warn and pass counts, a list of categories, pages sorted worst first, and the findings for one page with the fix for each."
+              />
+            </picture>
+          </div>
+        </div>
+      </section>
+
+      <div class="ticker">
+        <div class="ticker-view" aria-hidden="true">
+          <div class="ticker-track">
+            <span class="tick"><span class="badge c-fail">Fail</span><b>accessibility/color-contrast</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>core-seo/title-length</b></span>
+            <span class="tick"><span class="badge c-pass">Pass</span><b>security/https</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>links/broken-external</b></span>
+            <span class="tick"><span class="badge c-info">Info</span><b>structured-data/breadcrumb-valid</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>images/img-lazy-loading</b></span>
+            <span class="tick"><span class="badge c-fail">Fail</span><b>accessibility/link-name</b></span>
+            <span class="tick"><span class="badge c-pass">Pass</span><b>crawlability/robots-txt</b></span>
+            <span class="tick">RUN 12 · +6 SINCE RUN 11 · 0 NEW</span>
+            <span class="tick"><span class="badge c-fail">Fail</span><b>accessibility/color-contrast</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>core-seo/title-length</b></span>
+            <span class="tick"><span class="badge c-pass">Pass</span><b>security/https</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>links/broken-external</b></span>
+            <span class="tick"><span class="badge c-info">Info</span><b>structured-data/breadcrumb-valid</b></span>
+            <span class="tick"><span class="badge c-warn">Warn</span><b>images/img-lazy-loading</b></span>
+            <span class="tick"><span class="badge c-fail">Fail</span><b>accessibility/link-name</b></span>
+            <span class="tick"><span class="badge c-pass">Pass</span><b>crawlability/robots-txt</b></span>
+            <span class="tick">RUN 12 · +6 SINCE RUN 11 · 0 NEW</span>
+          </div>
+        </div>
+        <button class="ticker-toggle" type="button" data-ticker-toggle aria-pressed="false">Pause</button>
+      </div>
+
+      <section class="chapter statement">
+        <div class="wrap">
+          <p>
+            Every audit is saved on your disk. Next week, open <em>run 2</em> next to <em>run 1</em> and see which fixes landed and what
+            broke.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="features">
+        <div class="wrap">
+          <h2>105 checks on every page, each with a fix</h2>
+          <p class="lede">
+            The checks come from <a href="https://crates.io/crates/sitevet">the sitevet audit engine</a>, open-source and written in Rust. The
+            app adds the window around it: progress you can watch, a report you can sort and search, and a history of every run.
+          </p>
+
+          <div class="bento">
+            <article class="cell">
+              <span class="num">105<small>CHECKS · 15 CATEGORIES</small></span>
+              <h3>Every page, every check</h3>
+              <p>
+                Core SEO, content, links, images, accessibility, security, performance, structured data and more. Each finding shows the markup
+                that failed and how to fix it.
+              </p>
+              <div class="badges">
+                <span class="badge c-fail">Fail</span>
+                <span class="badge c-warn">Warn</span>
+                <span class="badge c-info">Info</span>
+                <span class="badge c-pass">Pass</span>
+              </div>
+            </article>
+            <article class="cell">
+              <h3>Audit several sites at once</h3>
+              <p>Paste a list of URLs and choose how many run side by side. A site that fails does not stop the others.</p>
+            </article>
+            <article class="cell">
+              <h3>A history of every run</h3>
+              <p>Chart the score across runs and compare any two, category by category, with the rules fixed and broken in between.</p>
+            </article>
+            <article class="cell full">
+              <div class="full-copy">
+                <h3>See each page's score as it finishes</h3>
+                <p>
+                  Pages appear with their score as soon as their checks are done, next to live fail, warn and pass counts. Cancel any time;
+                  finished runs go straight into history.
+                </p>
+              </div>
+              <div class="cell-shot">
+                <img
+                  src="img/running-dark.webp"
+                  width="1512"
+                  height="1014"
+                  loading="lazy"
+                  alt="An audit in progress: 28 of 40 pages done, 2,744 of 3,920 checks, and a list of pages with their scores, newest first."
+                />
+              </div>
+            </article>
+            <article class="cell">
+              <h3>Export to HTML, Markdown or JSON</h3>
+              <p>Save a run as an HTML report that prints to PDF, as Markdown for Word or an email, or as JSON for scripts.</p>
+            </article>
+            <article class="cell">
+              <h3>Set your audit defaults once</h3>
+              <p>
+                Page limits, crawl depth, concurrency and which checks run live in Settings. Change one value for a single audit without
+                touching the defaults.
+              </p>
+            </article>
+            <article class="cell">
+              <h3>No account, no uploads</h3>
+              <p>Audits run from your machine, and runs go into a local SQLite file that the sitevet command-line tool reads too.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter" id="screens">
+        <div class="wrap">
+          <h2>What the app looks like</h2>
+          <p class="lede">The report, history, settings and export, in a dark and a light theme that follow your system.</p>
+
+          <div class="tabs" role="tablist" aria-label="Screens">
+            <button type="button" role="tab" id="tab-report" aria-controls="panel-report" aria-selected="true">Report</button>
+            <button type="button" role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false" tabindex="-1">History</button>
+            <button type="button" role="tab" id="tab-new" aria-controls="panel-new" aria-selected="false" tabindex="-1">New audit</button>
+            <button type="button" role="tab" id="tab-export" aria-controls="panel-export" aria-selected="false" tabindex="-1">Export</button>
+            <button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Settings</button>
+          </div>
+
+          <!-- Images with data-light switch to their light version with the theme. -->
+          <figure class="panel" role="tabpanel" id="panel-report" aria-labelledby="tab-report">
+            <div class="shot">
+              <img
+                src="img/pages-dark.webp"
+                data-dark="img/pages-dark.webp"
+                data-light="img/pages-light.webp"
+                width="1512"
+                height="1014"
+                loading="lazy"
+                alt="The report: categories on the left, pages worst first in the middle, and the selected page's findings on the right."
+              />
+            </div>
+            <figcaption>
+              <span>Pick a category, then a page. Findings come with evidence and a fix.</span><span class="cap">Report</span>
+            </figcaption>
+          </figure>
+          <figure class="panel" role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden>
+            <div class="shot">
+              <img
+                src="img/history-dark.webp"
+                data-dark="img/history-dark.webp"
+                data-light="img/history-light.webp"
+                width="1512"
+                height="1014"
+                loading="lazy"
+                alt="History: the overall score across 12 runs on a line chart, a category-by-category compare of run 1 and run 12, and the list of runs with their scores."
+              />
+            </div>
+            <figcaption>
+              <span>Every run is kept. Compare any two and see what was fixed and what is new.</span><span class="cap">History</span>
+            </figcaption>
+          </figure>
+          <figure class="panel" role="tabpanel" id="panel-new" aria-labelledby="tab-new" hidden>
+            <div class="shot">
+              <img
+                src="img/new-audit-dark.webp"
+                width="1512"
+                height="1014"
+                loading="lazy"
+                alt="The new audit form: a start URL, page and depth limits, and switches for rendered checks, robots.txt, external links and comparing with the last run."
+              />
+            </div>
+            <figcaption><span>One site or a list. Starts from your saved defaults.</span><span class="cap">New audit</span></figcaption>
+          </figure>
+          <figure class="panel" role="tabpanel" id="panel-export" aria-labelledby="tab-export" hidden>
+            <div class="shot">
+              <img
+                src="img/export-dark.webp"
+                width="1512"
+                height="1014"
+                loading="lazy"
+                alt="The export menu open over the report, offering an HTML report, Markdown and JSON, each with a line on what it is for."
+              />
+            </div>
+            <figcaption><span>HTML, Markdown or JSON, saved wherever you choose.</span><span class="cap">Export</span></figcaption>
+          </figure>
+          <figure class="panel" role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
+            <div class="shot">
+              <img
+                src="img/settings-dark.webp"
+                width="1512"
+                height="1014"
+                loading="lazy"
+                alt="Settings: the app version and links, then the audit defaults with page limits and check switches."
+              />
+            </div>
+            <figcaption><span>The defaults every new audit starts from.</span><span class="cap">Settings</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="chapter" id="how">
+        <div class="wrap">
+          <h2>About two minutes for a 100-page site</h2>
+          <div class="steps">
+            <div class="step">
+              <span class="cap">01</span>
+              <h3>Enter a URL</h3>
+              <p>Paste the start page, or a list of sites. Your saved defaults fill in the rest.</p>
+            </div>
+            <div class="step">
+              <span class="cap">02</span>
+              <h3>Wait while it crawls</h3>
+              <p>It follows links on the same site, reads robots.txt and the sitemap, and checks each page.</p>
+            </div>
+            <div class="step">
+              <span class="cap">03</span>
+              <h3>Read the report</h3>
+              <p>Start with the lowest-scoring page. Every finding says what failed and how to fix it.</p>
+            </div>
+            <div class="step">
+              <span class="cap">04</span>
+              <h3>Audit again</h3>
+              <p>After a fix, run it again. History shows the change, rule by rule.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="final" id="download">
+        <div class="wrap">
+          <h2>Get SiteVet for your computer</h2>
+          <p class="lede">Free, MIT licensed, and the same app on all three systems.</p>
+
+          <div class="dl">
+            <a data-os="mac" href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP/releases/latest">
+              <span class="os">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path
+                    d="M16.4 12.6c0-2.5 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-1.9-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.8-4.4ZM14 5.2c.7-.8 1.2-2 1-3.2-1 .1-2.2.7-3 1.5-.6.7-1.2 1.9-1 3.1 1.1.1 2.3-.6 3-1.4Z"
+                  />
+                </svg>
+                macOS
+              </span>
+              <span class="cap">Apple silicon · .dmg</span>
+              <span class="meta" data-meta>Latest release on GitHub</span>
+            </a>
+            <a data-os="win" href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP/releases/latest">
+              <span class="os">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 5.1 10.4 4v7.1H3Zm0 13.8 7.4 1.1V13H3ZM11.3 3.9 21 2.5v8.6h-9.7Zm0 16.2L21 21.5V13h-9.7Z" />
+                </svg>
+                Windows
+              </span>
+              <span class="cap">64-bit installer · .exe</span>
+              <span class="meta" data-meta>Latest release on GitHub</span>
+            </a>
+            <a data-os="linux" href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP/releases/latest">
+              <span class="os">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path
+                    d="M5 20h14M8 20l1-4M16 20l-1-4M12 3a3 3 0 0 0-3 3v3.5C7.6 11 7 12.8 7 14.5 7 15.9 9.2 16 12 16s5-.1 5-1.5c0-1.7-.6-3.5-2-5V6a3 3 0 0 0-3-3Z"
+                  />
+                  <circle cx="10.6" cy="7" r=".6" fill="currentColor" />
+                  <circle cx="13.4" cy="7" r=".6" fill="currentColor" />
+                </svg>
+                Linux
+              </span>
+              <span class="cap">x86-64 · .AppImage</span>
+              <span class="meta" data-meta>Latest release on GitHub</span>
+            </a>
+          </div>
+
+          <div class="source">
+            <div>
+              <h3>First launch</h3>
+              <p>
+                The builds are not code-signed yet. On macOS, open System Settings, Privacy &amp; Security and click "Open Anyway" once. On
+                Windows, click "More info" and then "Run anyway". The app tells you when a newer version is out.
+              </p>
+            </div>
+            <div>
+              <h3>Or build it yourself</h3>
+              <p>With Rust installed, one command builds and installs it.</p>
+              <pre><code>cargo +1.100.0 install --locked \
+  --git https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP</code></pre>
+            </div>
+          </div>
+
+          <div class="faq">
+            <details>
+              <summary>Is it free?</summary>
+              <p>Yes. SiteVet and the sitevet engine are both MIT licensed, and the source is on GitHub.</p>
+            </details>
+            <details>
+              <summary>Does it send my data anywhere?</summary>
+              <p>
+                No. Your computer fetches the pages of the site you audit, and the results stay in a file on your disk. The only other request is
+                a check against GitHub for a newer version when the app starts.
+              </p>
+            </details>
+            <details>
+              <summary>Where are my runs stored?</summary>
+              <p>
+                In <code>history.db</code> in your system's data folder, for example <code>~/Library/Application Support/sitevet</code> on a Mac.
+                The sitevet command-line tool uses the same file, so runs from either one show up in both.
+              </p>
+            </details>
+            <details>
+              <summary>Can it check accessibility and Core Web Vitals in a real browser?</summary>
+              <p>
+                Yes. Turn on "Rendered checks in Chrome" and it runs axe-core and measures Core Web Vitals in the Chrome already installed on your
+                computer.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap foot">
+        <a class="foot-brand" href="#top" aria-label="Back to the top">
+          <img src="img/icon.svg" width="24" height="24" alt="" />
+        </a>
+        <span>MIT licence · <span class="mono" data-version>v0.3.0</span></span>
+        <span class="grow"></span>
+        <a href="releases.html">Releases</a>
+        <a href="https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP">GitHub</a>
+        <a href="https://crates.io/crates/sitevet">sitevet engine</a>
+        <a href="https://abdulkadersafi.com">Made by Abdulkader Safi</a>
+      </div>
+    </footer>
+
+    <script src="site.js"></script>
+  </body>
+</html>
