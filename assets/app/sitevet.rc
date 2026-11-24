@@ -1,0 +1,3 @@
+// Windows resources for the .exe. GPUI loads icon 1 for the window and taskbar, and the
+// installer's Start menu and desktop shortcuts take their icon from the .exe.
+1 ICON "icon.ico"
