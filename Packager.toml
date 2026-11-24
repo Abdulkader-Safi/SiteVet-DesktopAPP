@@ -2,7 +2,7 @@
 # Run `cargo packager --release` on the OS you are packaging for. Builds are unsigned.
 name = "sitevet-desktop"
 product-name = "SiteVet"
-version = "0.4.0"
+version = "0.5.0"
 identifier = "com.abdulkadersafi.sitevet"
 description = "Desktop app for the sitevet website audit engine."
 authors = ["Abdulkader Safi"]

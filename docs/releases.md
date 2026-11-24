@@ -1,5 +1,9 @@
 # Releases
 
+## v0.5.0 (2026-11-24)
+
+- Windows: the SiteVet icon now shows on the window, the taskbar, the Start menu and the desktop shortcut. Before, Windows showed its generic icon, because the icon was never built into the .exe (issue #8).
+
 ## v0.4.0 (2026-11-24)
 
 See what an audit is doing while it runs, and delete runs you no longer need.
