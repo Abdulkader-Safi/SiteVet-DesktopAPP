@@ -23,7 +23,7 @@ When a newer release is out, the app shows a small card in the bottom-right corn
 - The report for each site, in five tabs. Pages lists every page worst first, with its findings and measurements. Overview shows each category's score. Site-wide holds the findings that compare pages (duplicates, orphans). Changes lists what was fixed and what is new since the last run.
 - History: score by run on a chart, a side-by-side compare of any two runs per category, and the rules fixed or broken between them.
 - Dark and light themes. The app follows the system until you click the switch in the top bar.
-- Save as defaults keeps the form's settings in `desktop-defaults.toml`, next to the history database.
+- Settings (the gear in the top bar) shows the app version and links, and holds the audit defaults: limits, checks and every other option. New audits start from them. A value changed on the new audit form applies to that audit only, and Reset to defaults puts the saved values back. They are kept in `desktop-defaults.toml`, next to the history database.
 - Keyboard: `P` jumps to the site search. On the Pages tab, `C` searches categories and `/` searches pages.
 
 Export is planned. Its icon sits in the top bar but does nothing yet.
@@ -62,7 +62,8 @@ src/
   data.rs        history, settings and counts over the SDK (no UI code; has tests)
   theme.rs       colour tokens, type scale and fonts from the Figma file
   ui.rs          shared components: score chip, status badge, buttons, fields
-  screens/       report, history, new audit, progress
+  editor.rs      the audit options editor shared by New audit and Settings
+  screens/       report, history, new audit, progress, settings
 assets/
   fonts/         Schibsted Grotesk, JetBrains Mono, Saira Stencil One (OFL)
   icons/         the design's SVG icons

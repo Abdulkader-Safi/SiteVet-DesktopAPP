@@ -5,43 +5,9 @@ use gpui_kit::*;
 
 use crate::app::AppView;
 use crate::data;
-use crate::theme::{ActivePalette, Palette, TextStyles};
+use crate::editor::Which;
+use crate::theme::{ActivePalette, TextStyles};
 use crate::ui;
-
-/// A check row: title, description, square switch.
-fn check(
-    id: &'static str,
-    title: &'static str,
-    desc: String,
-    on: bool,
-    last: bool,
-    p: &Palette,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .gap(px(16.))
-        .px(px(16.))
-        .py(px(12.))
-        .cursor_pointer()
-        .when(!last, |d| d.border_b_1().border_color(p.border))
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .flex_1()
-                .min_w_0()
-                .gap(px(2.))
-                .child(div().body_medium().text_color(p.text).child(title))
-                .child(div().small().text_color(p.muted).child(desc)),
-        )
-        .child(ui::toggle(
-            SharedString::from(format!("{id}-toggle")),
-            on,
-            p,
-        ))
-}
 
 impl AppView {
     pub fn render_new_audit(
@@ -51,7 +17,7 @@ impl AppView {
     ) -> impl IntoElement {
         let p = cx.pal();
         let several = self.form.several;
-        let s = &self.form.settings;
+        let compare_on = self.form.editor.settings.compare_with_last;
 
         // What the one-site footer and compare line can promise.
         let one_url = self.form.start_url.read(cx).value().to_string();
@@ -67,175 +33,17 @@ impl AppView {
                 None => "Adds a changes view once the site has an earlier run.".to_string(),
             }
         };
+        let options = self.render_options(Which::Form, several, compare_desc, window, cx);
+        let custom = self.form.editor.differs_from(&self.defaults, cx);
 
-        let checks = div()
-            .flex()
-            .flex_col()
-            .gap(px(8.))
-            .w_full()
-            .child(ui::label("CHECKS", &p))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .bg(p.bg_surface)
-                    .border_1()
-                    .border_color(p.border)
-                    .child(
-                        check(
-                            "browser",
-                            "Rendered checks in Chrome",
-                            "axe-core accessibility and Core Web Vitals. Uses your installed Chrome.".into(),
-                            s.options.browser,
-                            false,
-                            &p,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            let o = &mut this.form.settings.options;
-                            o.browser = !o.browser;
-                            if !o.browser {
-                                o.render_crawl = false;
-                                o.screenshots = false;
-                            }
-                            cx.notify();
-                        })),
-                    )
-                    .child(
-                        check(
-                            "robots",
-                            "Obey robots.txt",
-                            "Skip pages the site asks crawlers to leave alone.".into(),
-                            !s.options.ignore_robots,
-                            false,
-                            &p,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.form.settings.options.ignore_robots ^= true;
-                            cx.notify();
-                        })),
-                    )
-                    .child(
-                        check(
-                            "external",
-                            "Check external links",
-                            "One HEAD request per external link, shared across pages.".into(),
-                            s.check_external_links,
-                            false,
-                            &p,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.form.settings.check_external_links ^= true;
-                            cx.notify();
-                        })),
-                    )
-                    .child(
-                        check("compare", "Compare with the last run", compare_desc, s.compare_with_last, !self.form.show_all, &p)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.form.settings.compare_with_last ^= true;
-                                cx.notify();
-                            })),
-                    )
-                    .when(self.form.show_all, |d| {
-                        d.child(
-                            check(
-                                "sitemap",
-                                "Seed from the sitemap",
-                                "Start the crawl from sitemap.xml as well as the start page.".into(),
-                                s.options.crawl_sitemap,
-                                false,
-                                &p,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.form.settings.options.crawl_sitemap ^= true;
-                                cx.notify();
-                            })),
-                        )
-                        .child(
-                            check(
-                                "render-crawl",
-                                "Find links after scripts run",
-                                "Reads links from the rendered page. Needs rendered checks.".into(),
-                                s.options.render_crawl,
-                                false,
-                                &p,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                let o = &mut this.form.settings.options;
-                                o.render_crawl = !o.render_crawl;
-                                o.browser |= o.render_crawl;
-                                cx.notify();
-                            })),
-                        )
-                        .child(
-                            check(
-                                "screenshots",
-                                "Screenshots",
-                                "Saves a screenshot of every page. Needs rendered checks.".into(),
-                                s.options.screenshots,
-                                true,
-                                &p,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                let o = &mut this.form.settings.options;
-                                o.screenshots = !o.screenshots;
-                                o.browser |= o.screenshots;
-                                cx.notify();
-                            })),
-                        )
-                    }),
-            );
-
-        // Every control the form offers once expanded.
-        let option_count = 4 + 3 + self.form.extras.len() + 3 + usize::from(several);
-        let extras = self.form.show_all.then(|| {
-            let fields: Vec<Div> = self
-                .form
-                .extras
-                .iter()
-                .map(|e| ui::field(e.name, &e.input, window, cx))
-                .collect();
-            let mut grid = div().flex().flex_col().gap(px(16.)).w_full();
-            let mut it = fields.into_iter();
-            loop {
-                let row: Vec<Div> = it.by_ref().take(2).collect();
-                if row.is_empty() {
-                    break;
-                }
-                grid = grid.child(div().flex().gap(px(16.)).w_full().children(row));
-            }
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(8.))
-                .w_full()
-                .child(ui::label("MORE OPTIONS", &p))
-                .child(grid)
-        });
-
-        let limits = div()
-            .flex()
-            .gap(px(16.))
-            .w_full()
-            .child(ui::field("MAX PAGES", &self.form.max_pages, window, cx))
-            .child(ui::field("MAX DEPTH", &self.form.max_depth, window, cx))
-            .child(ui::field("CONCURRENCY", &self.form.concurrency, window, cx))
-            .when(several, |d| {
-                d.child(ui::field(
-                    "SITES AT A TIME",
-                    &self.form.sites_at_a_time,
-                    window,
-                    cx,
-                ))
-            });
-
-        let footer_note = match (&self.form.note, several) {
-            (Some(n), _) => n.clone(),
-            (None, false) => match (known, s.compare_with_last) {
+        let footer_note = if several {
+            self.batch_estimate(cx)
+        } else {
+            match (known, compare_on) {
                 (Some(n), true) => format!("SAVED AS RUN {} · COMPARED WITH RUN {n}", n + 1),
                 (Some(n), false) => format!("SAVED AS RUN {}", n + 1),
                 (None, _) => "SAVED AS RUN 1".into(),
-            },
-            (None, true) => self.batch_estimate(cx),
+            }
         };
         let run_label = if several {
             format!(
@@ -266,6 +74,23 @@ impl AppView {
                 .into_any_element()
         };
 
+        // Says where the values come from, and links to where the defaults are kept.
+        let source = div()
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .small()
+            .text_color(p.muted)
+            .child(if custom {
+                "Changed for this audit only. The next audit starts from your defaults again."
+            } else {
+                "Using your defaults."
+            })
+            .child(
+                ui::link("open-settings", "Edit defaults in Settings", &p)
+                    .on_click(cx.listener(|this, _, window, cx| this.open_settings(window, cx))),
+            );
+
         let form = div()
             .flex()
             .flex_col()
@@ -292,32 +117,19 @@ impl AppView {
                         this.form.several = false;
                         cx.notify();
                     })))
-                    .child(ui::segment("several", "Several sites", several, &p).on_click(cx.listener(|this, _, window, cx| {
+                    .child(ui::segment("several", "Several sites", several, &p).on_click(cx.listener(|this, _, _, cx| {
                         if !this.form.several && this.form.sites.is_empty() {
                             // Start the list with the one-site URL, if any.
                             let url = this.form.start_url.read(cx).value().to_string();
                             this.form.sites.extend(data::parse_urls(&url));
-                            let _ = window;
                         }
                         this.form.several = true;
                         cx.notify();
                     }))),
             )
             .child(target)
-            .child(limits)
-            .child(checks)
-            .children(extras)
-            .child(
-                ui::link(
-                    "show-all",
-                    if self.form.show_all { "Show fewer options".to_string() } else { format!("Show all {option_count} options") },
-                    &p,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.form.show_all ^= true;
-                    cx.notify();
-                })),
-            )
+            .child(options)
+            .child(source)
             .when_some(self.form.error.clone(), |d, e| d.child(div().small().text_color(p.fail).child(e)))
             .child(
                 div()
@@ -327,12 +139,14 @@ impl AppView {
                     .py(px(4.))
                     .child(
                         ui::button_primary("run", run_label, 40., &p)
-                            .on_click(cx.listener(|this, _, _, cx| this.run_from_form(cx))),
+                            .on_click(cx.listener(|this, _, window, cx| this.run_from_form(window, cx))),
                     )
-                    .child(
-                        ui::button_secondary("defaults", "Save as defaults", 40., &p)
-                            .on_click(cx.listener(|this, _, _, cx| this.save_defaults(cx))),
-                    )
+                    .when(custom, |d| {
+                        d.child(
+                            ui::button_secondary("reset", "Reset to defaults", 40., &p)
+                                .on_click(cx.listener(|this, _, window, cx| this.reset_form(window, cx))),
+                        )
+                    })
                     .child(ui::spacer())
                     .child(ui::micro(footer_note, p.muted)),
             );
@@ -469,6 +283,7 @@ impl AppView {
         let n = self.form.sites.len();
         let parallel: usize = self
             .form
+            .editor
             .sites_at_a_time
             .read(cx)
             .value()
