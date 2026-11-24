@@ -109,11 +109,18 @@ impl AppView {
                     .child(link_row("portfolio", "MADE BY", PORTFOLIO, true, &p, cx)),
             );
 
-        let note = match (&self.settings_error, &self.settings_note, unsaved) {
-            (Some(e), _, _) => ui::micro(e.to_uppercase(), p.fail),
-            (None, Some(n), _) => ui::micro(n.clone(), p.muted),
-            (None, None, true) => ui::micro("NOT SAVED YET", p.warn),
-            (None, None, false) => ui::micro("", p.muted),
+        let field_error = self.defaults_editor.read(cx).err();
+        let note = match (
+            field_error,
+            &self.settings_error,
+            unsaved,
+            &self.settings_note,
+        ) {
+            (Some(e), _, _, _) => ui::micro(e.to_uppercase(), p.fail),
+            (None, Some(e), _, _) => ui::micro(e.to_uppercase(), p.fail),
+            (None, None, true, _) => ui::micro("NOT SAVED YET", p.warn),
+            (None, None, false, Some(n)) => ui::micro(n.clone(), p.muted),
+            (None, None, false, None) => ui::micro("", p.muted),
         };
 
         let defaults = div()

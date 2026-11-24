@@ -183,12 +183,20 @@ impl OptionsEditor {
 
     /// The settings as typed, or which field is wrong.
     pub fn read(&self, cx: &App) -> Result<AuditSettings, String> {
+        self.read_with(true, cx)
+    }
+
+    /// Like `read`, but leaves "Sites at a time" as it was when that field is hidden, so a
+    /// value you cannot see never blocks a one-site audit.
+    pub fn read_with(&self, sites_field: bool, cx: &App) -> Result<AuditSettings, String> {
         let v = |e: &Entity<InputState>| e.read(cx).value().to_string();
         let mut s = self.settings.clone();
         s.options.max_pages = num("Max pages", &v(&self.max_pages))?;
         s.options.max_depth = num("Max depth", &v(&self.max_depth))?;
         s.options.concurrency = num("Concurrency", &v(&self.concurrency))?;
-        s.sites_at_a_time = num::<usize>("Sites at a time", &v(&self.sites_at_a_time))?.max(1);
+        if sites_field {
+            s.sites_at_a_time = num::<usize>("Sites at a time", &v(&self.sites_at_a_time))?.max(1);
+        }
         for (spec, e) in EXTRAS.iter().zip(&self.extras) {
             (spec.apply)(&mut s.options, &v(e))?;
         }

@@ -23,7 +23,7 @@ impl AppView {
         let one_url = self.form.start_url.read(cx).value().to_string();
         let known = data::parse_urls(&one_url)
             .first()
-            .and_then(|u| self.sites.iter().find(|s| s.host() == data::host_of(u)))
+            .and_then(|u| self.site_for(u))
             .map(|s| s.runs.len());
         let compare_desc = if several {
             "Each site is compared with its own last run, when it has one.".to_string()
@@ -171,11 +171,7 @@ impl AppView {
             .iter()
             .enumerate()
             .map(|(i, url)| {
-                let last = self
-                    .sites
-                    .iter()
-                    .find(|s| s.host() == data::host_of(url))
-                    .map(|s| s.latest.score);
+                let last = self.site_for(url).map(|s| s.latest.score);
                 div()
                     .flex()
                     .items_center()
@@ -301,12 +297,7 @@ impl AppView {
             .form
             .sites
             .iter()
-            .map(|u| {
-                self.sites
-                    .iter()
-                    .find(|s| s.host() == data::host_of(u))
-                    .map_or(fallback, |s| s.latest.duration_ms)
-            })
+            .map(|u| self.site_for(u).map_or(fallback, |s| s.latest.duration_ms))
             .sum();
         let minutes = (total / parallel as u64).div_ceil(60_000).max(1);
         format!(
