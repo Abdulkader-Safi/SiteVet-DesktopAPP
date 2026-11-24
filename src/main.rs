@@ -4,6 +4,7 @@ mod data;
 mod screens;
 mod theme;
 mod ui;
+mod update;
 
 use gpui_kit::*;
 
