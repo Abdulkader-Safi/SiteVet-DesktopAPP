@@ -2,6 +2,8 @@
 name = "sitevet-desktop"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/Abdulkader-Safi/SiteVet-DesktopAPP"
 
 [dependencies]
 directories = "6.0.0"
