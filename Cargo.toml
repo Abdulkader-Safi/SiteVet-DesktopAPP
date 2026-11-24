@@ -19,3 +19,6 @@ url = "2"
 
 [dev-dependencies]
 tempfile = "3.27.0"
+
+[build-dependencies]
+embed-resource = "3.0"
