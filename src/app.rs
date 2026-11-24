@@ -72,6 +72,38 @@ pub enum RunStatus {
 }
 
 /// One audit started from this window, live or finished.
+/// One line of a run's activity log.
+pub struct LogLine {
+    /// Milliseconds since the run started.
+    pub at_ms: u64,
+    pub level: LogLevel,
+    pub text: String,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum LogLevel {
+    Info,
+    Warn,
+    Fail,
+}
+
+/// A page as the crawl fetched it.
+pub struct Fetched {
+    pub url: String,
+    /// 0 when the request itself failed.
+    pub status: u16,
+    pub ms: u64,
+}
+
+/// `03:41` from milliseconds, for log times.
+pub fn clock(ms: u64) -> String {
+    let s = ms / 1000;
+    format!("{:02}:{:02}", s / 60, s % 60)
+}
+
+/// Lines kept per run; older ones are dropped so a 10,000-page audit stays small.
+const LOG_CAP: usize = 2000;
+
 pub struct LiveRun {
     pub url: String,
     pub settings: AuditSettings,
@@ -81,7 +113,14 @@ pub struct LiveRun {
     pub started_clock: String,
     pub elapsed_ms: u64,
     pub max_pages: u32,
-    pub fetched: Vec<String>,
+    pub fetched: Vec<Fetched>,
+    /// When the engine last sent anything, to tell a slow step from a stuck one.
+    pub last_event: Option<Instant>,
+    pub log: Vec<LogLine>,
+    /// Pages whose request failed or answered 4xx or 5xx.
+    pub failed_fetches: u32,
+    /// Chrome render progress between the crawl and the checks: (done, total).
+    pub rendered: Option<(u32, u32)>,
     /// Newest last: (url, score).
     pub completed: Vec<(String, u8)>,
     pub pages_total: Option<u32>,
@@ -123,6 +162,10 @@ impl LiveRun {
             RunStatus::Done | RunStatus::Saving => 1.,
             RunStatus::Queued => 0.,
             _ if self.checks_total > 0 => self.checks_done as f32 / self.checks_total as f32,
+            _ if self.rendered.is_some() => {
+                let (done, total) = self.rendered.unwrap_or((0, 1));
+                done as f32 / total.max(1) as f32
+            }
             // ponytail: during the crawl the total is unknown; pages fetched against the cap
             // is the best guess and jumps once the crawl completes.
             _ => {
@@ -132,9 +175,53 @@ impl LiveRun {
         }
     }
 
+    pub fn log(&mut self, level: LogLevel, text: impl Into<String>) {
+        let at_ms = self.started.map_or(0, |t| t.elapsed().as_millis() as u64);
+        if self.log.len() >= LOG_CAP {
+            self.log.drain(..LOG_CAP / 10);
+        }
+        self.log.push(LogLine {
+            at_ms,
+            level,
+            text: text.into(),
+        });
+    }
+
+    /// How long the engine has been silent, while it is running.
+    pub fn quiet_ms(&self) -> Option<u64> {
+        match self.status {
+            RunStatus::Running => self
+                .last_event
+                .or(self.started)
+                .map(|t| t.elapsed().as_millis() as u64),
+            _ => None,
+        }
+    }
+
+    /// The log as plain text, for the clipboard.
+    pub fn log_text(&self) -> String {
+        let mut out = format!("SiteVet {} · {}\n", env!("CARGO_PKG_VERSION"), self.url);
+        for l in &self.log {
+            let tag = match l.level {
+                LogLevel::Info => "     ",
+                LogLevel::Warn => "WARN ",
+                LogLevel::Fail => "FAIL ",
+            };
+            out.push_str(&format!("{} {tag}{}\n", clock(l.at_ms), l.text));
+        }
+        out
+    }
+
     pub fn run_number(&self) -> usize {
         self.prev.map_or(1, |(n, _)| n + 1)
     }
+}
+
+/// What the confirm dialog will delete from history.
+#[derive(Clone)]
+pub enum Delete {
+    Run { id: RunId, origin: String },
+    Site { origin: String },
 }
 
 pub struct Batch {
@@ -181,6 +268,11 @@ pub struct AppView {
     pub compare: (Option<RunId>, Option<RunId>),
     pub compare_cache: Option<((RunId, RunId), Arc<ReportDiff>)>,
     pub open_select: OpenSelect,
+    /// The running screen shows the activity log instead of the page list.
+    pub run_log: bool,
+    /// Waiting for the user to confirm a delete.
+    pub pending_delete: Option<Delete>,
+    pub delete_error: Option<String>,
     pub changes_from_history: bool,
     // Audits.
     pub form: Form,
@@ -281,6 +373,9 @@ impl AppView {
             compare: (None, None),
             compare_cache: None,
             open_select: OpenSelect::None,
+            run_log: false,
+            pending_delete: None,
+            delete_error: None,
             changes_from_history: false,
             form,
             defaults,
@@ -527,6 +622,93 @@ impl AppView {
         self.start_one(url, self.defaults.clone(), cx);
     }
 
+    // ---- Deleting from history ----
+
+    pub fn ask_delete(&mut self, what: Delete, cx: &mut Context<Self>) {
+        self.delete_error = None;
+        self.pending_delete = Some(what);
+        cx.notify();
+    }
+
+    /// The runs a pending delete covers.
+    pub fn delete_ids(&self, what: &Delete) -> Vec<RunId> {
+        match what {
+            Delete::Run { id, .. } => vec![*id],
+            Delete::Site { origin } => self
+                .sites
+                .iter()
+                .find(|s| &s.origin == origin)
+                .map(|s| s.runs.iter().map(|r| r.id).collect())
+                .unwrap_or_default(),
+        }
+    }
+
+    pub fn confirm_delete(&mut self, cx: &mut Context<Self>) {
+        let Some(what) = self.pending_delete.clone() else {
+            return;
+        };
+        let ids = self.delete_ids(&what);
+        let task = cx.background_spawn({
+            let ids = ids.clone();
+            async move { data::delete_runs(&ids) }
+        });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |app, cx| match result {
+                Ok(_) => {
+                    app.pending_delete = None;
+                    app.forget_runs(&ids, &what);
+                    app.reload_sites(None, cx);
+                }
+                Err(e) => {
+                    app.delete_error = Some(e);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Drops everything cached about deleted runs, and leaves a deleted site's screen.
+    fn forget_runs(&mut self, ids: &[RunId], what: &Delete) {
+        for id in ids {
+            self.reports.remove(id);
+            self.load_failed.remove(id);
+        }
+        let gone = |id: &Option<RunId>| id.is_some_and(|id| ids.contains(&id));
+        if gone(&self.compare.0) {
+            self.compare.0 = None;
+        }
+        if gone(&self.compare.1) {
+            self.compare.1 = None;
+        }
+        self.compare_cache = None;
+        self.changes_from_history = false;
+        let site_gone = match what {
+            Delete::Site { origin } => Some(origin.clone()),
+            // The last run of a site takes the site with it.
+            Delete::Run { origin, .. } => self
+                .sites
+                .iter()
+                .find(|s| &s.origin == origin)
+                .filter(|s| s.runs.iter().all(|r| ids.contains(&r.id)))
+                .map(|s| s.origin.clone()),
+        };
+        if let Some(origin) = site_gone {
+            self.sites.retain(|s| s.origin != origin);
+            if self.selected.as_deref() == Some(origin.as_str()) {
+                self.selected = None;
+                match self.sites.first().map(|s| s.origin.clone()) {
+                    Some(next) => {
+                        self.selected = Some(next);
+                        self.screen = Screen::Report;
+                    }
+                    None => self.screen = Screen::NewAudit,
+                }
+            }
+        }
+    }
+
     // ---- Settings ----
 
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -584,6 +766,10 @@ impl AppView {
             started_clock: String::new(),
             elapsed_ms: 0,
             fetched: Vec::new(),
+            last_event: None,
+            log: Vec::new(),
+            failed_fetches: 0,
+            rendered: None,
             completed: Vec::new(),
             pages_total: None,
             checks_done: 0,
@@ -675,6 +861,7 @@ impl AppView {
             }
             run.elapsed_ms = run.elapsed();
             run.status = RunStatus::Cancelled;
+            run.log(LogLevel::Warn, "Cancelled");
         }
         self.pump_batch(cx);
         cx.notify();
@@ -698,6 +885,13 @@ impl AppView {
         run.handle = Some(handle);
         run.status = RunStatus::Running;
         run.started = Some(Instant::now());
+        let o = &run.settings.options;
+        let rendered = if o.browser { "on" } else { "off" };
+        let line = format!(
+            "Options: up to {} pages, depth {}, {} requests at a time, rendered checks {rendered}",
+            o.max_pages, o.max_depth, o.concurrency
+        );
+        run.log(LogLevel::Info, line);
         run.started_clock = time::now_clock();
         cx.spawn(async move |this, cx| {
             while let Ok(first) = rx.recv().await {
@@ -729,16 +923,88 @@ impl AppView {
         if run.status != RunStatus::Running {
             return;
         }
+        run.last_event = Some(Instant::now());
         match ev {
-            AuditEvent::AuditStart { max_pages, .. } => run.max_pages = max_pages,
-            AuditEvent::PageFetched { url, .. } => run.fetched.push(url),
+            AuditEvent::AuditStart { url, max_pages } => {
+                run.max_pages = max_pages;
+                run.log(
+                    LogLevel::Info,
+                    format!("Started {url}, up to {max_pages} pages"),
+                );
+            }
+            AuditEvent::PageFetched {
+                url,
+                status,
+                depth,
+                ms,
+                ..
+            } => {
+                let level = match status {
+                    0 => LogLevel::Fail,
+                    400.. => LogLevel::Warn,
+                    _ => LogLevel::Info,
+                };
+                if level != LogLevel::Info {
+                    run.failed_fetches += 1;
+                }
+                let code = if status == 0 {
+                    "ERR".to_string()
+                } else {
+                    status.to_string()
+                };
+                run.log(
+                    level,
+                    format!(
+                        "Fetched {code} {} ({ms} ms, depth {depth})",
+                        data::path_of(&url)
+                    ),
+                );
+                run.fetched.push(Fetched { url, status, ms });
+            }
+            AuditEvent::PageRendered {
+                url,
+                ok,
+                index,
+                pages,
+            } => {
+                run.rendered = Some((index, pages));
+                let level = if ok { LogLevel::Info } else { LogLevel::Warn };
+                let what = if ok { "Rendered" } else { "Could not render" };
+                run.log(
+                    level,
+                    format!("{what} {} in Chrome ({index}/{pages})", data::path_of(&url)),
+                );
+            }
+            AuditEvent::RenderComplete {
+                provider,
+                rendered,
+                pages,
+                ms,
+            } => {
+                run.rendered = Some((rendered, pages));
+                run.log(
+                    LogLevel::Info,
+                    format!(
+                        "Rendering done with {provider}: {rendered} of {pages} pages in {}",
+                        data::duration_label(ms)
+                    ),
+                );
+            }
             AuditEvent::CrawlComplete {
                 pages,
                 checks_total,
-                ..
+                ms,
             } => {
                 run.pages_total = Some(pages);
                 run.checks_total = checks_total;
+                run.log(
+                    LogLevel::Info,
+                    format!(
+                        "Crawl done: {pages} pages in {}. Running {} checks",
+                        data::duration_label(ms),
+                        data::thousands(checks_total.into())
+                    ),
+                );
             }
             AuditEvent::CheckComplete {
                 status,
@@ -755,8 +1021,27 @@ impl AppView {
                     _ => {}
                 }
             }
-            AuditEvent::PageComplete { url, score, .. } => run.completed.push((url, score)),
-            AuditEvent::AuditComplete { report, .. } => {
+            AuditEvent::PageComplete {
+                url,
+                score,
+                findings,
+                ms,
+                ..
+            } => {
+                run.log(
+                    LogLevel::Info,
+                    format!(
+                        "Checked {}: score {score}, {findings} findings ({ms} ms)",
+                        data::path_of(&url)
+                    ),
+                );
+                run.completed.push((url, score));
+            }
+            AuditEvent::AuditComplete { report, score, .. } => {
+                run.log(
+                    LogLevel::Info,
+                    format!("Audit done: score {score}. Saving to history"),
+                );
                 run.status = RunStatus::Saving;
                 run.elapsed_ms = run.elapsed();
                 run.handle = None;
@@ -795,6 +1080,7 @@ impl AppView {
                 let run = &mut app.runs[idx];
                 if run.status == RunStatus::Running {
                     run.elapsed_ms = run.elapsed();
+                    run.log(LogLevel::Fail, format!("Stopped: {err}"));
                     run.status = RunStatus::Failed(err);
                 }
                 app.pump_batch(cx);
@@ -815,8 +1101,14 @@ impl AppView {
         let run = &mut self.runs[idx];
         run.report = Some(Arc::new(report));
         run.status = match saved {
-            Ok(_) => RunStatus::Done,
-            Err(e) => RunStatus::Failed(format!("Finished, but saving to history failed: {e}")),
+            Ok(_) => {
+                run.log(LogLevel::Info, "Saved to history");
+                RunStatus::Done
+            }
+            Err(e) => {
+                run.log(LogLevel::Fail, format!("Saving to history failed: {e}"));
+                RunStatus::Failed(format!("Finished, but saving to history failed: {e}"))
+            }
         };
         let open = self.screen == Screen::Running(idx);
         if open {
@@ -885,12 +1177,18 @@ impl AppView {
             if ev.keystroke.key == "escape" {
                 window.focus(&self.focus, cx);
                 self.open_select = OpenSelect::None;
+                self.pending_delete = None;
                 cx.notify();
             }
             return;
         }
         let m = &ev.keystroke.modifiers;
         if m.platform || m.control || m.alt || m.function {
+            return;
+        }
+        if ev.keystroke.key == "escape" && self.pending_delete.is_some() {
+            self.pending_delete = None;
+            cx.notify();
             return;
         }
         let target = match ev.keystroke.key.as_str() {
@@ -933,21 +1231,37 @@ impl AppView {
                 _ => false,
             };
             let origin = site.origin.clone();
+            let group = SharedString::from(format!("site-row-{i}"));
             let row = match run {
                 Some(r) => self.running_row(r, &host, &p),
                 None => {
                     let issues = data::site_issues(&site.latest);
-                    site_row(
-                        &host,
-                        data::issues_label(&issues),
-                        p.muted,
-                        ui::score_chip(site.latest.score, &p),
-                        &p,
-                    )
+                    let del = site.origin.clone();
+                    let right = div()
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .gap(px(6.))
+                        .child(
+                            ui::trash_button(("del-site", i), group.clone(), false, &p).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    cx.stop_propagation();
+                                    this.ask_delete(
+                                        Delete::Site {
+                                            origin: del.clone(),
+                                        },
+                                        cx,
+                                    );
+                                }),
+                            ),
+                        )
+                        .child(ui::score_chip(site.latest.score, &p));
+                    site_row(&host, data::issues_label(&issues), p.muted, right, &p)
                 }
             };
             rows.push(
-                row.id(("site", i))
+                row.group(group)
+                    .id(("site", i))
                     .when(selected, |d| d.bg(p.bg_raised).child(ui::edge(&p)))
                     .on_click(
                         cx.listener(move |this, _, _, cx| match this.run_for(&origin) {
@@ -1322,10 +1636,125 @@ impl Render for AppView {
                     .children(self.export_card(cx))
                     .children(self.update_popup(cx)),
             )
+            .children(self.delete_dialog(cx))
     }
 }
 
 impl AppView {
+    /// Confirms a delete from history. The CLI shares this history, so it says so.
+    fn delete_dialog(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let what = self.pending_delete.as_ref()?;
+        let p = cx.pal();
+        let ids = self.delete_ids(what);
+        let n = ids.len();
+        let (title, body, button) = match what {
+            Delete::Site { origin } => (
+                format!("Delete {}?", data::host_of(origin)),
+                format!(
+                    "This removes all {n} run{} of this site from history, with their reports.",
+                    if n == 1 { "" } else { "s" }
+                ),
+                if n == 1 {
+                    "Delete 1 run".to_string()
+                } else {
+                    format!("Delete {n} runs")
+                },
+            ),
+            Delete::Run { id, origin } => {
+                let site = self.sites.iter().find(|s| &s.origin == origin);
+                let number = site.and_then(|s| s.run_number(*id)).unwrap_or(0);
+                let summary = site.and_then(|s| s.runs.iter().find(|r| r.id == *id));
+                let when = summary.map_or(String::new(), |r| {
+                    format!(" ({}, score {})", time::date_time(&r.started_at), r.score)
+                });
+                let last = site.is_some_and(|s| s.runs.len() == 1);
+                (
+                    format!("Delete run {number} of {}?", data::host_of(origin)),
+                    if last {
+                        format!(
+                            "This removes run {number}{when} and its report. It is the site's only run, so the site leaves the list too."
+                        )
+                    } else {
+                        format!(
+                            "This removes run {number}{when} and its report from history. The site's other runs stay."
+                        )
+                    },
+                    "Delete run".to_string(),
+                )
+            }
+        };
+        let scrim = if cx.global::<theme::Appearance>().dark {
+            hsla(0., 0., 0., 0.6)
+        } else {
+            hsla(240. / 360., 0.05, 0.04, 0.3)
+        };
+        Some(
+            div()
+                .id("delete-scrim")
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(scrim)
+                .occlude()
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.pending_delete = None;
+                    cx.notify();
+                }))
+                .child(
+                    div()
+                        .id("delete-dialog")
+                        .w(px(460.))
+                        .flex()
+                        .flex_col()
+                        .bg(p.bg_surface)
+                        .border_1()
+                        .border_color(p.border_strong)
+                        // Clicks inside the dialog do not reach the scrim.
+                        .on_click(|_, _, cx| cx.stop_propagation())
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(10.))
+                                .p(px(20.))
+                                .child(div().h2().text_color(p.text).child(title))
+                                .child(div().body().text_color(p.text).child(body))
+                                .child(div().small().text_color(p.muted).child(
+                                    "The sitevet command-line tool reads the same history, so the runs are removed there too. This cannot be undone.",
+                                ))
+                                .when_some(self.delete_error.clone(), |d, e| {
+                                    d.child(div().small().text_color(p.fail).child(format!("Could not delete: {e}")))
+                                }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(10.))
+                                .px(px(20.))
+                                .py(px(14.))
+                                .bg(p.bg_sunken)
+                                .border_t_1()
+                                .border_color(p.border)
+                                .child(ui::micro("ESC TO CANCEL", p.muted))
+                                .child(ui::spacer())
+                                .child(ui::button_secondary("delete-cancel", "Cancel", 36., &p).on_click(cx.listener(
+                                    |this, _, _, cx| {
+                                        this.pending_delete = None;
+                                        cx.notify();
+                                    },
+                                )))
+                                .child(ui::button_danger("delete-confirm", button, 36., &p).on_click(cx.listener(
+                                    |this, _, _, cx| this.confirm_delete(cx),
+                                ))),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+
     /// Bottom-right card when GitHub has a newer release. Download opens the installer for
     /// this OS in the browser; Later hides the card until the next start.
     fn update_popup(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {

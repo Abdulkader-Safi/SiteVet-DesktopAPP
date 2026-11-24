@@ -197,6 +197,22 @@ pub fn save_report(report: &mut AuditReport, compare: bool) -> Result<sitevet::R
     history.save(report).map_err(|e| e.to_string())
 }
 
+/// Removes runs from history. Returns how many were there to remove. Blocking.
+pub fn delete_runs(ids: &[sitevet::RunId]) -> Result<usize, String> {
+    let history = History::open(None).map_err(|e| e.to_string())?;
+    delete_runs_from(&history, ids)
+}
+
+pub fn delete_runs_from(history: &History, ids: &[sitevet::RunId]) -> Result<usize, String> {
+    let mut removed = 0;
+    for &id in ids {
+        if history.delete(id).map_err(|e| e.to_string())? {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
 /// What the new audit form edits. `options` holds every SDK setting; the two flags below
 /// are app-level switches with no field of their own in `Options`.
 #[derive(Clone)]
@@ -489,6 +505,34 @@ mod tests {
         assert_eq!(rules.len(), sitevet::all_rules().len() - 1);
         assert!(rules.iter().all(|r| r.meta().id != EXTERNAL_LINKS_RULE));
         assert!(AuditSettings::default().options_for_run().rules.is_none());
+    }
+
+    #[test]
+    fn deleting_runs_and_whole_sites() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = History::open(Some(dir.path().join("h.db"))).unwrap();
+        let mut a = report(80, &[]);
+        let a1 = h.save(&a).unwrap();
+        a.score = 90;
+        let a2 = h.save(&a).unwrap();
+        let mut b = report(70, &[]);
+        b.start_url = "https://b.org".into();
+        let b1 = h.save(&b).unwrap();
+
+        // One run: the site stays, with its other run as the latest.
+        assert_eq!(delete_runs_from(&h, &[a2]).unwrap(), 1);
+        let sites = load_sites_from(&h).unwrap();
+        let a_site = sites.iter().find(|s| s.host() == "a.com").unwrap();
+        assert_eq!(a_site.runs.len(), 1);
+        assert_eq!(a_site.latest.score, 80);
+
+        // A whole site: every run goes, other sites stay. A missing ID counts as nothing.
+        let ids: Vec<_> = a_site.runs.iter().map(|r| r.id).chain([a2]).collect();
+        assert_eq!(delete_runs_from(&h, &ids).unwrap(), 1);
+        let sites = load_sites_from(&h).unwrap();
+        assert_eq!(sites.len(), 1);
+        assert_eq!(sites[0].runs[0].id, b1);
+        assert!(h.load(a1).is_err());
     }
 
     #[test]
