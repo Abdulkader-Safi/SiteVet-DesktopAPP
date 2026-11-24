@@ -72,6 +72,31 @@ pub fn issues_label(i: &Issues) -> String {
     }
 }
 
+/// The SDK's category names (its own table is private).
+const CATEGORY_NAMES: [(&str, &str); 17] = [
+    ("core-seo", "Core SEO"),
+    ("content", "Content"),
+    ("links", "Links"),
+    ("images", "Images"),
+    ("structured-data", "Structured data"),
+    ("security", "Security"),
+    ("crawlability", "Crawlability"),
+    ("url-structure", "URL structure"),
+    ("social-media", "Social media"),
+    ("internationalization", "Internationalization"),
+    ("legal", "Legal"),
+    ("analytics", "Analytics"),
+    ("eeat", "E-E-A-T"),
+    ("accessibility", "Accessibility"),
+    ("performance", "Performance"),
+    ("answer-engine", "Answer engine"),
+    ("site", "Site-wide"),
+];
+
+pub fn category_name(id: &str) -> String {
+    CATEGORY_NAMES.iter().find(|(c, _)| *c == id).map_or_else(|| id.to_string(), |(_, n)| n.to_string())
+}
+
 /// `abdulkadersafi.com` from `https://abdulkadersafi.com/blog`.
 pub fn host_of(url: &str) -> &str {
     let rest = url.split_once("://").map_or(url, |(_, r)| r);
@@ -248,10 +273,6 @@ pub mod time {
         local(rfc3339).map_or_else(|| rfc3339.to_string(), |z| z.strftime("%Y-%m-%d").to_string())
     }
 
-    /// `11-13`
-    pub fn month_day(rfc3339: &str) -> String {
-        local(rfc3339).map_or_else(|| rfc3339.to_string(), |z| z.strftime("%m-%d").to_string())
-    }
 
     /// `14:52` for now.
     pub fn now_clock() -> String {

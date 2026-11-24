@@ -6911,7 +6911,6 @@ dependencies = [
 name = "sitevet-desktop"
 version = "0.1.0"
 dependencies = [
- "async-channel",
  "directories",
  "futures",
  "gpui-kit",
